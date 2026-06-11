@@ -272,9 +272,51 @@
       width: min(560px, calc(100vw - 24px));
       padding: 14px 16px;
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 1fr auto auto;
       gap: 10px 14px;
       align-items: center;
+    }
+
+    .collapse-toggle {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(244, 234, 215, .18);
+      border-radius: 7px;
+      background: rgba(0, 0, 0, .24);
+      color: #ffe4a5;
+      cursor: pointer;
+      transition: background .16s ease, border-color .16s ease, transform .16s ease;
+    }
+
+    .collapse-toggle:hover {
+      border-color: rgba(214, 177, 94, .65);
+      background: rgba(214, 177, 94, .16);
+    }
+
+    .chevron {
+      width: 10px;
+      height: 10px;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(45deg) translateY(-2px);
+      transition: transform .18s ease;
+    }
+
+    .is-collapsed .chevron {
+      transform: rotate(-45deg) translateX(-2px);
+    }
+
+    .topbar.is-collapsed {
+      width: min(440px, calc(100vw - 24px));
+      grid-template-columns: 1fr auto;
+    }
+
+    .topbar.is-collapsed .subtitle,
+    .topbar.is-collapsed .date-readout,
+    .topbar.is-collapsed .legend {
+      display: none;
     }
 
     .title {
@@ -368,6 +410,13 @@
       background: var(--panel-strong);
     }
 
+    .briefing-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: start;
+    }
+
     .eyebrow {
       margin: 0 0 6px;
       color: var(--gold);
@@ -426,6 +475,28 @@
       padding: 8px;
       scrollbar-width: thin;
       scrollbar-color: rgba(214, 177, 94, .55) rgba(0, 0, 0, .2);
+    }
+
+    .right-panel.is-collapsed {
+      max-height: none;
+    }
+
+    .right-panel.is-collapsed .briefing {
+      border-bottom: 0;
+      padding: 12px 14px;
+    }
+
+    .right-panel.is-collapsed .briefing p,
+    .right-panel.is-collapsed .intel-grid,
+    .right-panel.is-collapsed .event-list {
+      display: none;
+    }
+
+    .right-panel.is-collapsed .briefing h2 {
+      font-size: 16px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .event-card {
@@ -704,8 +775,12 @@
 
     @media (max-width: 760px) {
       .topbar {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr auto;
         padding: 12px;
+      }
+
+      .topbar .title {
+        grid-column: 1 / -1;
       }
 
       .date-readout {
@@ -778,7 +853,7 @@
     <canvas id="theater"></canvas>
     <div id="labelLayer"></div>
 
-    <section class="hud panel topbar" aria-label="戰情總覽">
+    <section class="hud panel topbar" id="topbarPanel" aria-label="戰情總覽">
       <div class="title">
         <h1>第二次世界大戰 3D 戰情室</h1>
         <div class="subtitle">互動式戰略沙盤，結合地形、軍勢移動、戰力、將領、船艦與戰術特效。</div>
@@ -787,6 +862,9 @@
         <strong id="yearReadout">1939</strong>
         <span id="dateReadout">09.01</span>
       </div>
+      <button class="collapse-toggle" type="button" data-collapse-target="topbarPanel" aria-label="收折戰情室標題框" aria-expanded="true">
+        <span class="chevron" aria-hidden="true"></span>
+      </button>
       <div class="legend">
         <span class="legend-item"><i class="dot blue"></i>藍方 同盟國</span>
         <span class="legend-item"><i class="dot red"></i>紅方 軸心國</span>
@@ -803,10 +881,17 @@
       <button class="icon-btn" data-camera="africa" title="北非">北非</button>
     </nav>
 
-    <aside class="hud panel right-panel" aria-label="戰情事件">
+    <aside class="hud panel right-panel" id="theaterPanel" aria-label="戰情事件">
       <div class="briefing">
-        <p class="eyebrow" id="theaterName">Europe Theater</p>
-        <h2 id="eventTitle">德軍入侵波蘭</h2>
+        <div class="briefing-head">
+          <div>
+            <p class="eyebrow" id="theaterName">Europe Theater</p>
+            <h2 id="eventTitle">德軍入侵波蘭</h2>
+          </div>
+          <button class="collapse-toggle" type="button" data-collapse-target="theaterPanel" aria-label="收折戰區資訊框" aria-expanded="true">
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+        </div>
         <p id="eventSummary">裝甲與空軍同步突破邊境，波蘭防線被迫向華沙收縮。</p>
         <div class="intel-grid">
           <div class="intel"><span>將領</span><b id="leaders">希特勒、波克、里茲-希米格維</b></div>
@@ -1524,6 +1609,15 @@
           setCameraPreset(button.dataset.camera, true);
           document.querySelectorAll("[data-camera]").forEach((b) => b.classList.remove("active"));
           button.classList.add("active");
+        });
+      });
+
+      document.querySelectorAll("[data-collapse-target]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const panel = document.getElementById(button.dataset.collapseTarget);
+          if (!panel) return;
+          const collapsed = panel.classList.toggle("is-collapsed");
+          button.setAttribute("aria-expanded", `${!collapsed}`);
         });
       });
 
