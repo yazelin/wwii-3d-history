@@ -958,6 +958,8 @@
     };
 
     const WORLD = { width: 82, height: 42 };
+    const IS_GLOBE = true;
+    const GLOBE = { radius: 18 };
 
     const countries = {
       usa: { name: "美國", short: "US", side: "allied", flag: "usa" },
@@ -1444,6 +1446,11 @@
     }
 
     function initMap() {
+      if (IS_GLOBE) {
+        initGlobeMap();
+        return;
+      }
+
       const ocean = new THREE.Mesh(
         new THREE.PlaneGeometry(WORLD.width, WORLD.height, 96, 48),
         new THREE.MeshStandardMaterial({
@@ -1509,12 +1516,70 @@
       addMapCountryLabels();
     }
 
+    function initGlobeMap() {
+      const globeTexture = createGlobeTexture();
+      const globe = new THREE.Mesh(
+        new THREE.SphereGeometry(GLOBE.radius, 128, 72),
+        new THREE.MeshStandardMaterial({
+          map: globeTexture,
+          roughness: 0.68,
+          metalness: 0.04,
+          emissive: 0x06121a,
+          emissiveIntensity: 0.18
+        })
+      );
+      globe.receiveShadow = true;
+      globe.castShadow = true;
+      mapGroup.add(globe);
+
+      const atmosphere = new THREE.Mesh(
+        new THREE.SphereGeometry(GLOBE.radius + 0.28, 96, 48),
+        new THREE.MeshBasicMaterial({
+          color: 0x5fbfff,
+          transparent: true,
+          opacity: 0.09,
+          side: THREE.BackSide,
+          depthWrite: false
+        })
+      );
+      mapGroup.add(atmosphere);
+
+      const equator = new THREE.Mesh(
+        new THREE.TorusGeometry(GLOBE.radius + 0.05, 0.018, 8, 160),
+        new THREE.MeshBasicMaterial({ color: 0xd6b15e, transparent: true, opacity: 0.32 })
+      );
+      equator.rotation.x = Math.PI / 2;
+      mapGroup.add(equator);
+
+      [-60, -30, 30, 60].forEach((lat) => {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry((GLOBE.radius + 0.045) * Math.cos(THREE.MathUtils.degToRad(lat)), 0.008, 6, 128),
+          new THREE.MeshBasicMaterial({ color: 0xc8ad6a, transparent: true, opacity: 0.16 })
+        );
+        ring.position.y = (GLOBE.radius + 0.045) * Math.sin(THREE.MathUtils.degToRad(lat));
+        ring.rotation.x = Math.PI / 2;
+        mapGroup.add(ring);
+      });
+
+      addMountainRange("阿爾卑斯", [[6, 46], [10, 47], [14, 46.5]], 0.8);
+      addMountainRange("喜馬拉雅", [[74, 32], [84, 29], [94, 28]], 1.2);
+      addMountainRange("洛磯山脈", [[-123, 50], [-116, 42], [-110, 35]], 0.9);
+      addMountainRange("撒哈拉沙丘", [[-5, 23], [12, 21], [25, 24]], 0.5, 0xc6a35d);
+
+      addNeutralZone("瑞士", 8.2, 46.8);
+      addNeutralZone("西班牙", -3.8, 40.2);
+      addNeutralZone("土耳其", 35, 39);
+      addNeutralZone("瑞典", 15, 62);
+      addMapCountryLabels();
+    }
+
     function initCities() {
       cities.forEach((city) => {
         const country = countries[city.country] || countries.neutral;
         const pos = geoToWorld(city.lon, city.lat, 0.45);
         const marker = new THREE.Group();
         marker.position.copy(pos);
+        orientObjectUp(marker, pos);
 
         const mat = new THREE.MeshStandardMaterial({
           color: SIDE_COLORS[country.side],
@@ -1973,12 +2038,17 @@
       const group = new THREE.Group();
       const start = from.clone();
       const end = to.clone();
-      const mid = start.clone().lerp(end, 0.5);
-      mid.y += lift;
-
-      const points = [start, mid, end];
-      const curve = new THREE.CatmullRomCurve3(points);
-      const curvePoints = curve.getPoints(48);
+      let curvePoints;
+      if (IS_GLOBE) {
+        const altitude = type === "air" ? 3.4 : 0.88 + lift * 0.22;
+        curvePoints = Array.from({ length: 54 }, (_, i) => globeSurfacePointFromVectors(start, end, i / 53, altitude));
+      } else {
+        const mid = start.clone().lerp(end, 0.5);
+        mid.y += lift;
+        const points = [start, mid, end];
+        const curve = new THREE.CatmullRomCurve3(points);
+        curvePoints = curve.getPoints(48);
+      }
       const geo = new THREE.BufferGeometry().setFromPoints(curvePoints);
       const material = new THREE.LineBasicMaterial({
         color,
@@ -2017,8 +2087,13 @@
             })
           );
           ring.position.copy(center);
-          ring.position.y += 0.08 + i * 0.05;
-          ring.rotation.x = Math.PI / 2;
+          if (IS_GLOBE) {
+            ring.position.setLength(ring.position.length() + 0.08 + i * 0.05);
+            ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), center.clone().normalize());
+          } else {
+            ring.position.y += 0.08 + i * 0.05;
+            ring.rotation.x = Math.PI / 2;
+          }
           ring.userData.effect = "ring";
           ring.userData.phase = i * 0.7;
           effectGroup.add(ring);
@@ -2067,10 +2142,22 @@
       const count = effect === "fog" ? 140 : 220;
       const positions = new Float32Array(count * 3);
       const focus = geoToWorld(event.focus[0], event.focus[1], 0);
+      const normal = IS_GLOBE ? focus.clone().normalize() : null;
+      const frame = IS_GLOBE ? surfaceFrame(normal) : null;
       for (let i = 0; i < count; i++) {
-        positions[i * 3 + 0] = focus.x + (Math.random() - 0.5) * 9;
-        positions[i * 3 + 1] = 1 + Math.random() * (effect === "fog" ? 3.8 : 6.2);
-        positions[i * 3 + 2] = focus.z + (Math.random() - 0.5) * 6.6;
+        if (IS_GLOBE) {
+          const p = focus.clone()
+            .addScaledVector(frame.tangentA, (Math.random() - 0.5) * 7.2)
+            .addScaledVector(frame.tangentB, (Math.random() - 0.5) * 5.6)
+            .addScaledVector(normal, 1 + Math.random() * (effect === "fog" ? 2.6 : 4.8));
+          positions[i * 3 + 0] = p.x;
+          positions[i * 3 + 1] = p.y;
+          positions[i * 3 + 2] = p.z;
+        } else {
+          positions[i * 3 + 0] = focus.x + (Math.random() - 0.5) * 9;
+          positions[i * 3 + 1] = 1 + Math.random() * (effect === "fog" ? 3.8 : 6.2);
+          positions[i * 3 + 2] = focus.z + (Math.random() - 0.5) * 6.6;
+        }
       }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -2084,6 +2171,8 @@
       weatherParticles = new THREE.Points(geo, mat);
       weatherParticles.userData.effect = effect;
       weatherParticles.userData.focus = focus;
+      weatherParticles.userData.normal = normal;
+      weatherParticles.userData.frame = frame;
       weatherGroup.add(weatherParticles);
     }
 
@@ -2149,11 +2238,20 @@
 
       activeUnits.forEach((item, index) => {
         const local = Math.min(1, Math.max(0, ease + index * 0.035));
-        item.unit.position.copy(item.from.clone().lerp(item.to, local));
-        item.unit.position.y += Math.sin(performance.now() * 0.002 + item.pulse) * 0.035;
-        const dir = item.to.clone().sub(item.from);
-        if (dir.lengthSq() > 0.001) {
-          item.unit.rotation.y = Math.atan2(dir.x, dir.z) + Math.PI / 2;
+        if (IS_GLOBE) {
+          const altitude = item.move.type === "air" ? 3.15 : 0.72;
+          const bob = Math.sin(performance.now() * 0.002 + item.pulse) * 0.04;
+          const pos = globeSurfacePointFromVectors(item.from, item.to, local, altitude + bob);
+          const next = globeSurfacePointFromVectors(item.from, item.to, Math.min(1, local + 0.018), altitude + bob);
+          item.unit.position.copy(pos);
+          orientUnitOnGlobe(item.unit, pos, next);
+        } else {
+          item.unit.position.copy(item.from.clone().lerp(item.to, local));
+          item.unit.position.y += Math.sin(performance.now() * 0.002 + item.pulse) * 0.035;
+          const dir = item.to.clone().sub(item.from);
+          if (dir.lengthSq() > 0.001) {
+            item.unit.rotation.y = Math.atan2(dir.x, dir.z) + Math.PI / 2;
+          }
         }
       });
     }
@@ -2190,27 +2288,55 @@
         const effect = weatherParticles.userData.effect;
         const attr = weatherParticles.geometry.getAttribute("position");
         const focus = weatherParticles.userData.focus;
+        const normal = weatherParticles.userData.normal;
+        const frame = weatherParticles.userData.frame;
         for (let i = 0; i < attr.count; i++) {
           let y = attr.getY(i);
           let x = attr.getX(i);
           let z = attr.getZ(i);
-          if (effect === "snow") {
-            y -= dt * 1.5;
-            x += Math.sin(now * 0.001 + i) * dt * 0.2;
-          } else if (effect === "rain") {
-            y -= dt * 4.4;
-            x += dt * 0.5;
-          } else if (effect === "dust") {
-            y += dt * 0.35;
-            x += dt * 0.9;
+          if (IS_GLOBE && normal && frame) {
+            const p = new THREE.Vector3(x, y, z);
+            if (effect === "snow") {
+              p.addScaledVector(normal, -dt * 1.2);
+              p.addScaledVector(frame.tangentA, Math.sin(now * 0.001 + i) * dt * 0.18);
+            } else if (effect === "rain") {
+              p.addScaledVector(normal, -dt * 3.4);
+              p.addScaledVector(frame.tangentA, dt * 0.45);
+            } else if (effect === "dust") {
+              p.addScaledVector(normal, dt * 0.22);
+              p.addScaledVector(frame.tangentA, dt * 0.55);
+            } else {
+              p.addScaledVector(frame.tangentA, Math.sin(now * 0.0007 + i) * dt * 0.24);
+              p.addScaledVector(frame.tangentB, Math.cos(now * 0.0009 + i) * dt * 0.2);
+            }
+            if (p.length() < GLOBE.radius + 0.34 || p.distanceTo(focus) > 7.2) {
+              p.copy(focus)
+                .addScaledVector(frame.tangentA, (Math.random() - 0.5) * 7.2)
+                .addScaledVector(frame.tangentB, (Math.random() - 0.5) * 5.6)
+                .addScaledVector(normal, 1 + Math.random() * 4.8);
+            }
+            x = p.x;
+            y = p.y;
+            z = p.z;
           } else {
-            x += Math.sin(now * 0.0007 + i) * dt * 0.24;
-            z += Math.cos(now * 0.0009 + i) * dt * 0.2;
-          }
-          if (y < 0.25 || y > 6.6 || Math.abs(x - focus.x) > 6) {
-            y = 1 + Math.random() * 5.5;
-            x = focus.x + (Math.random() - 0.5) * 9;
-            z = focus.z + (Math.random() - 0.5) * 6.6;
+            if (effect === "snow") {
+              y -= dt * 1.5;
+              x += Math.sin(now * 0.001 + i) * dt * 0.2;
+            } else if (effect === "rain") {
+              y -= dt * 4.4;
+              x += dt * 0.5;
+            } else if (effect === "dust") {
+              y += dt * 0.35;
+              x += dt * 0.9;
+            } else {
+              x += Math.sin(now * 0.0007 + i) * dt * 0.24;
+              z += Math.cos(now * 0.0009 + i) * dt * 0.2;
+            }
+            if (y < 0.25 || y > 6.6 || Math.abs(x - focus.x) > 6) {
+              y = 1 + Math.random() * 5.5;
+              x = focus.x + (Math.random() - 0.5) * 9;
+              z = focus.z + (Math.random() - 0.5) * 6.6;
+            }
           }
           attr.setXYZ(i, x, y, z);
         }
@@ -2339,6 +2465,13 @@
         }
         item.object.updateWorldMatrix(true, false);
         tempVec.setFromMatrixPosition(item.object.matrixWorld);
+        if (IS_GLOBE && tempVec.length() > GLOBE.radius - 0.5) {
+          const facing = tempVec.clone().normalize().dot(camera.position.clone().sub(tempVec).normalize());
+          if (facing < -0.02) {
+            item.el.style.opacity = 0;
+            return;
+          }
+        }
         tempVec.project(camera);
         const visible = tempVec.z > -1 && tempVec.z < 1;
         if (!visible) {
@@ -2384,6 +2517,8 @@
     }
 
     function geoToWorld(lon, lat, y = 0) {
+      if (IS_GLOBE) return geoToGlobe(lon, lat, y);
+
       let wrappedLon = lon;
       if (wrappedLon > 180) wrappedLon -= 360;
       if (wrappedLon < -180) wrappedLon += 360;
@@ -2392,6 +2527,56 @@
         y,
         -(lat / 90) * (WORLD.height / 2)
       );
+    }
+
+    function geoToGlobe(lon, lat, altitude = 0) {
+      let wrappedLon = lon;
+      if (wrappedLon > 180) wrappedLon -= 360;
+      if (wrappedLon < -180) wrappedLon += 360;
+      const lonRad = THREE.MathUtils.degToRad(wrappedLon);
+      const latRad = THREE.MathUtils.degToRad(lat);
+      const radius = GLOBE.radius + altitude;
+      const cosLat = Math.cos(latRad);
+      return new THREE.Vector3(
+        radius * cosLat * Math.sin(lonRad),
+        radius * Math.sin(latRad),
+        radius * cosLat * Math.cos(lonRad)
+      );
+    }
+
+    function globeSurfacePointFromVectors(from, to, t, altitude = 0) {
+      const a = from.clone().normalize();
+      const b = to.clone().normalize();
+      const mixed = a.lerp(b, t).normalize();
+      return mixed.multiplyScalar(GLOBE.radius + altitude);
+    }
+
+    function orientObjectUp(object, position) {
+      if (!IS_GLOBE) return;
+      const normal = position.clone().normalize();
+      object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+    }
+
+    function orientUnitOnGlobe(object, position, nextPosition) {
+      if (!IS_GLOBE) return;
+      const up = position.clone().normalize();
+      const forward = nextPosition.clone().sub(position).projectOnPlane(up);
+      if (forward.lengthSq() < 0.0001) {
+        orientObjectUp(object, position);
+        return;
+      }
+      forward.normalize();
+      const side = new THREE.Vector3().crossVectors(up, forward).normalize();
+      const correctedForward = new THREE.Vector3().crossVectors(side, up).normalize();
+      const matrix = new THREE.Matrix4().makeBasis(correctedForward, up, side);
+      object.quaternion.setFromRotationMatrix(matrix);
+    }
+
+    function surfaceFrame(normal) {
+      const fallback = Math.abs(normal.y) > 0.85 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+      const tangentA = new THREE.Vector3().crossVectors(fallback, normal).normalize();
+      const tangentB = new THREE.Vector3().crossVectors(normal, tangentA).normalize();
+      return { tangentA, tangentB };
     }
 
     function makePolyline(points, color, opacity, y = 0.12) {
@@ -2476,6 +2661,65 @@
       return texture;
     }
 
+    function createGlobeTexture() {
+      const canvasMap = document.createElement("canvas");
+      canvasMap.width = 2400;
+      canvasMap.height = 1200;
+      const ctx = canvasMap.getContext("2d");
+
+      const ocean = ctx.createLinearGradient(0, 0, canvasMap.width, canvasMap.height);
+      ocean.addColorStop(0, "#123245");
+      ocean.addColorStop(0.55, "#174d66");
+      ocean.addColorStop(1, "#0b2636");
+      ctx.fillStyle = ocean;
+      ctx.fillRect(0, 0, canvasMap.width, canvasMap.height);
+
+      drawMapGrid(ctx, canvasMap.width, canvasMap.height);
+
+      landMasses.forEach((land) => {
+        drawMapPolygon(ctx, land.points, {
+          width: canvasMap.width,
+          height: canvasMap.height,
+          fill: "rgba(102, 123, 80, .82)",
+          stroke: "rgba(236, 214, 143, .54)",
+          lineWidth: 3
+        });
+      });
+
+      mapCountryAreas.forEach((area) => {
+        drawMapPolygon(ctx, area.points, {
+          width: canvasMap.width,
+          height: canvasMap.height,
+          fill: mapSideFill(area.side, .46),
+          stroke: mapSideStroke(area.side, .9),
+          lineWidth: 4
+        });
+      });
+
+      mapCountryAreas
+        .filter((area) => shouldDrawMapText(area))
+        .forEach((area) => {
+          const [x, y] = mapProject(area.label[0], area.label[1], canvasMap.width, canvasMap.height);
+          ctx.save();
+          ctx.font = "900 26px 'Microsoft JhengHei', 'Noto Sans TC', sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.lineWidth = 7;
+          ctx.strokeStyle = "rgba(6, 8, 8, .82)";
+          ctx.fillStyle = mapSideText(area.side);
+          ctx.strokeText(area.name, x, y);
+          ctx.fillText(area.name, x, y);
+          ctx.restore();
+        });
+
+      const texture = new THREE.CanvasTexture(canvasMap);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = 8;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.needsUpdate = true;
+      return texture;
+    }
+
     function shouldDrawMapText(area) {
       return ["加拿大", "美國", "巴西", "北非英軍區", "蘇聯", "印度", "中國", "日本", "澳洲"].includes(area.name);
     }
@@ -2553,6 +2797,7 @@
       mapCountryLabels.forEach((label) => {
         const obj = new THREE.Object3D();
         obj.position.copy(geoToWorld(label.lon, label.lat, 0.72));
+        orientObjectUp(obj, obj.position);
         mapGroup.add(obj);
         addLabel(obj, label.name, `scene-label map-country ${label.side}`);
       });
@@ -2560,13 +2805,14 @@
 
     function addMountainRange(name, points, scale = 1, color = 0x7c704f) {
       points.forEach(([lon, lat], index) => {
-        const pos = geoToWorld(lon, lat, 0.14);
+        const pos = geoToWorld(lon, lat, IS_GLOBE ? 0.48 * scale : 0.14);
         const peak = new THREE.Mesh(
           new THREE.ConeGeometry(0.42 * scale, 1.15 * scale, 4),
           new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0.04 })
         );
         peak.position.copy(pos);
-        peak.position.y += 0.46 * scale;
+        if (IS_GLOBE) orientObjectUp(peak, pos);
+        else peak.position.y += 0.46 * scale;
         peak.rotation.y = index * 0.7;
         peak.castShadow = true;
         peak.receiveShadow = true;
@@ -2574,6 +2820,7 @@
       });
       const labelObj = new THREE.Object3D();
       labelObj.position.copy(geoToWorld(points[Math.floor(points.length / 2)][0], points[Math.floor(points.length / 2)][1], 1.3 * scale));
+      orientObjectUp(labelObj, labelObj.position);
       mapGroup.add(labelObj);
       addLabel(labelObj, name, "scene-label city");
     }
@@ -2585,6 +2832,7 @@
         new THREE.MeshBasicMaterial({ color: SIDE_COLORS.neutral, transparent: true, opacity: 0.55 })
       );
       marker.position.copy(pos);
+      orientObjectUp(marker, pos);
       mapGroup.add(marker);
       addLabel(marker, name, "scene-label city");
     }
