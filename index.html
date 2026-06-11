@@ -1,0 +1,2684 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第二次世界大戰 3D 戰情室</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #11100d;
+      --ink: #f4ead7;
+      --muted: #b8ad9a;
+      --panel: rgba(24, 22, 18, .82);
+      --panel-strong: rgba(39, 34, 27, .94);
+      --line: rgba(244, 234, 215, .18);
+      --gold: #d6b15e;
+      --blue: #3ca7ff;
+      --red: #ff4e42;
+      --green: #58d47b;
+      --sea: #15384c;
+      --land: #50644c;
+      --shadow: 0 18px 50px rgba(0, 0, 0, .38);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    body {
+      min-width: 320px;
+    }
+
+    #app {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background:
+        radial-gradient(circle at 28% 18%, rgba(214, 177, 94, .14), transparent 34%),
+        linear-gradient(145deg, #17120f 0%, #0d1717 52%, #1d1711 100%);
+    }
+
+    #theater {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #theater:active {
+      cursor: grabbing;
+    }
+
+    #labelLayer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .scene-label {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      min-width: max-content;
+      padding: 4px 7px;
+      border: 1px solid rgba(244, 234, 215, .22);
+      border-radius: 6px;
+      background: rgba(15, 15, 12, .76);
+      color: #fff7e7;
+      font-size: 12px;
+      line-height: 1.3;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, .8);
+      box-shadow: 0 8px 18px rgba(0, 0, 0, .24);
+      white-space: nowrap;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    .scene-label.city {
+      background: rgba(30, 34, 27, .76);
+      color: #eee2c8;
+      border-color: rgba(214, 177, 94, .28);
+    }
+
+    .scene-label.map-country {
+      padding: 3px 7px;
+      background: rgba(8, 12, 13, .66);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .scene-label.map-country.allied {
+      border-color: rgba(60, 167, 255, .5);
+      color: #bfe7ff;
+    }
+
+    .scene-label.map-country.axis {
+      border-color: rgba(255, 78, 66, .5);
+      color: #ffc1bc;
+    }
+
+    .scene-label.map-country.neutral {
+      border-color: rgba(88, 212, 123, .5);
+      color: #c7ffd5;
+    }
+
+    .scene-label.unit-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      background: rgba(14, 13, 11, .82);
+      font-weight: 700;
+    }
+
+    .mini-flag {
+      position: relative;
+      width: 30px;
+      height: 18px;
+      flex: 0 0 auto;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .65);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, .22);
+      background: #777;
+    }
+
+    .mini-flag.usa {
+      background: repeating-linear-gradient(to bottom, #b52234 0 2px, #fff 2px 4px);
+    }
+
+    .mini-flag.usa:before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 13px;
+      height: 10px;
+      background: #23406f;
+    }
+
+    .mini-flag.uk {
+      background:
+        linear-gradient(32deg, transparent 42%, #fff 42% 48%, #c8102e 48% 54%, #fff 54% 60%, transparent 60%),
+        linear-gradient(148deg, transparent 42%, #fff 42% 48%, #c8102e 48% 54%, #fff 54% 60%, transparent 60%),
+        linear-gradient(to right, transparent 39%, #fff 39% 45%, #c8102e 45% 55%, #fff 55% 61%, transparent 61%),
+        linear-gradient(to bottom, transparent 35%, #fff 35% 43%, #c8102e 43% 57%, #fff 57% 65%, transparent 65%),
+        #012169;
+    }
+
+    .mini-flag.ussr {
+      background: #c81925;
+    }
+
+    .mini-flag.ussr:before {
+      content: "★";
+      position: absolute;
+      left: 3px;
+      top: -3px;
+      color: #ffd23f;
+      font-size: 12px;
+    }
+
+    .mini-flag.china {
+      background: #de2910;
+    }
+
+    .mini-flag.china:before {
+      content: "✺";
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 13px;
+      height: 10px;
+      background: #002b7f;
+      color: #fff;
+      font-size: 8px;
+      line-height: 10px;
+      text-align: center;
+    }
+
+    .mini-flag.france {
+      background: linear-gradient(to right, #002395 0 33%, #fff 33% 66%, #ed2939 66%);
+    }
+
+    .mini-flag.poland {
+      background: linear-gradient(to bottom, #fff 0 50%, #dc143c 50%);
+    }
+
+    .mini-flag.germany {
+      background: #c51f2b;
+    }
+
+    .mini-flag.germany:before {
+      content: "";
+      position: absolute;
+      inset: 3px 8px;
+      background:
+        linear-gradient(to right, transparent 38%, #111 38% 62%, transparent 62%),
+        linear-gradient(to bottom, transparent 36%, #111 36% 64%, transparent 64%),
+        #f2f2f2;
+      border-radius: 50%;
+    }
+
+    .mini-flag.japan {
+      background:
+        repeating-conic-gradient(from 0deg, rgba(188, 0, 45, .95) 0 8deg, transparent 8deg 18deg),
+        #fff;
+    }
+
+    .mini-flag.japan:before {
+      content: "";
+      position: absolute;
+      left: 10px;
+      top: 4px;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #bc002d;
+    }
+
+    .mini-flag.italy {
+      background: linear-gradient(to right, #009246 0 33%, #fff 33% 66%, #ce2b37 66%);
+    }
+
+    .mini-flag.neutral {
+      background: #1d8d52;
+    }
+
+    .mini-flag.neutral:before {
+      content: "+";
+      position: absolute;
+      inset: 0;
+      color: #fff;
+      font-weight: 900;
+      line-height: 16px;
+      text-align: center;
+    }
+
+    .hud {
+      position: absolute;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .panel {
+      pointer-events: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .topbar {
+      left: clamp(12px, 2vw, 26px);
+      top: clamp(10px, 2vh, 22px);
+      width: min(560px, calc(100vw - 24px));
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px 14px;
+      align-items: center;
+    }
+
+    .title {
+      min-width: 0;
+    }
+
+    .title h1 {
+      margin: 0;
+      font-size: clamp(20px, 3.1vw, 42px);
+      line-height: 1.03;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .date-readout {
+      min-width: 120px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(214, 177, 94, .3);
+      background: rgba(214, 177, 94, .12);
+      color: #ffe1a0;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .date-readout strong {
+      display: block;
+      font-size: 20px;
+      line-height: 1.1;
+    }
+
+    .date-readout span {
+      display: block;
+      margin-top: 3px;
+      font-size: 11px;
+      color: #e2c781;
+    }
+
+    .legend {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-top: 2px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 24px;
+      padding: 4px 8px;
+      border: 1px solid rgba(244, 234, 215, .12);
+      border-radius: 6px;
+      background: rgba(0, 0, 0, .22);
+      font-size: 12px;
+      color: #e7dccb;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      box-shadow: 0 0 14px currentColor;
+    }
+
+    .dot.blue { color: var(--blue); background: var(--blue); }
+    .dot.red { color: var(--red); background: var(--red); }
+    .dot.green { color: var(--green); background: var(--green); }
+
+    .right-panel {
+      right: clamp(10px, 2vw, 24px);
+      top: clamp(10px, 2vh, 22px);
+      width: min(420px, calc(100vw - 20px));
+      max-height: calc(100vh - 180px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .briefing {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-strong);
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--gold);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .briefing h2 {
+      margin: 0;
+      font-size: 21px;
+      line-height: 1.2;
+    }
+
+    .briefing p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .intel-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .intel {
+      min-height: 66px;
+      padding: 8px;
+      border: 1px solid rgba(244, 234, 215, .12);
+      border-radius: 6px;
+      background: rgba(0, 0, 0, .18);
+    }
+
+    .intel span {
+      display: block;
+      margin-bottom: 4px;
+      color: #cbbf9d;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .intel b {
+      display: block;
+      color: #fff7e7;
+      font-size: 13px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .event-list {
+      overflow: auto;
+      padding: 8px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(214, 177, 94, .55) rgba(0, 0, 0, .2);
+    }
+
+    .event-card {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 70px 1fr;
+      gap: 8px;
+      margin: 0 0 7px;
+      padding: 9px;
+      border: 1px solid rgba(244, 234, 215, .1);
+      border-radius: 7px;
+      background: rgba(0, 0, 0, .18);
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color .18s ease, background .18s ease, transform .18s ease;
+      font: inherit;
+    }
+
+    .event-card:hover,
+    .event-card.active {
+      border-color: rgba(214, 177, 94, .62);
+      background: rgba(214, 177, 94, .12);
+      transform: translateX(-2px);
+    }
+
+    .event-card .when {
+      color: #e8c77d;
+      font-size: 12px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .event-card .what {
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.3;
+    }
+
+    .event-card .who {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.3;
+    }
+
+    .camera-dock {
+      left: clamp(12px, 2vw, 26px);
+      top: 205px;
+      width: 70px;
+      padding: 8px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .icon-btn,
+    .mode-btn,
+    .speed-btn {
+      min-height: 38px;
+      border: 1px solid rgba(244, 234, 215, .18);
+      border-radius: 7px;
+      background: rgba(0, 0, 0, .24);
+      color: var(--ink);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease;
+    }
+
+    .icon-btn:hover,
+    .mode-btn:hover,
+    .speed-btn:hover,
+    .icon-btn.active,
+    .mode-btn.active,
+    .speed-btn.active {
+      border-color: rgba(214, 177, 94, .65);
+      background: rgba(214, 177, 94, .16);
+      color: #ffe4a5;
+      transform: translateY(-1px);
+    }
+
+    .bottom-console {
+      left: clamp(10px, 2vw, 24px);
+      right: clamp(10px, 2vw, 24px);
+      bottom: clamp(10px, 2vh, 20px);
+      padding: 10px 12px 12px;
+      display: grid;
+      grid-template-columns: auto auto 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .play-btn {
+      width: 44px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(214, 177, 94, .54);
+      border-radius: 8px;
+      background: rgba(214, 177, 94, .15);
+      color: #ffe4a5;
+      cursor: pointer;
+    }
+
+    .play-btn .pause-icon,
+    .play-btn.playing .play-icon {
+      display: none;
+    }
+
+    .play-btn.playing .pause-icon {
+      display: block;
+    }
+
+    .play-icon {
+      width: 0;
+      height: 0;
+      margin-left: 3px;
+      border-top: 9px solid transparent;
+      border-bottom: 9px solid transparent;
+      border-left: 15px solid currentColor;
+    }
+
+    .pause-icon {
+      width: 18px;
+      height: 18px;
+      background: linear-gradient(to right, currentColor 0 35%, transparent 35% 65%, currentColor 65%);
+    }
+
+    .speed-group {
+      display: flex;
+      gap: 6px;
+    }
+
+    .speed-btn {
+      min-width: 44px;
+      min-height: 34px;
+      padding: 0 8px;
+    }
+
+    .timeline-wrap {
+      min-width: 0;
+      display: grid;
+      gap: 5px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin: 0;
+      accent-color: var(--gold);
+      cursor: pointer;
+    }
+
+    .ticks {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      color: #cabd9c;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .ticks span {
+      position: relative;
+      min-width: 0;
+    }
+
+    .ticks span:before {
+      content: "";
+      display: block;
+      width: 1px;
+      height: 8px;
+      margin-bottom: 2px;
+      background: rgba(244, 234, 215, .28);
+    }
+
+    .mode-group {
+      display: flex;
+      gap: 6px;
+    }
+
+    .mode-btn {
+      min-width: 64px;
+      padding: 0 10px;
+    }
+
+    .tactic-banner {
+      left: 50%;
+      top: 18%;
+      transform: translateX(-50%);
+      min-width: min(560px, calc(100vw - 28px));
+      padding: 13px 18px;
+      border-color: rgba(255, 198, 86, .55);
+      background: linear-gradient(90deg, rgba(126, 33, 28, .86), rgba(26, 74, 99, .86));
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .28s ease, transform .28s ease;
+    }
+
+    .tactic-banner.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-8px);
+    }
+
+    .tactic-banner strong {
+      color: #fff2bc;
+      font-size: clamp(18px, 2.4vw, 30px);
+      letter-spacing: 0;
+    }
+
+    .flag-strip {
+      position: absolute;
+      left: 50%;
+      top: clamp(10px, 2vh, 22px);
+      z-index: 9;
+      transform: translateX(-50%);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 7px;
+      max-width: min(760px, 42vw);
+      pointer-events: none;
+    }
+
+    .flag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 26px;
+      padding: 4px 7px;
+      border: 1px solid rgba(244, 234, 215, .16);
+      border-radius: 6px;
+      background: rgba(15, 14, 11, .72);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, .24);
+      color: #f3e8d6;
+      font-size: 11px;
+      font-weight: 800;
+      backdrop-filter: blur(10px);
+    }
+
+    .status-line {
+      position: absolute;
+      left: 50%;
+      bottom: 88px;
+      z-index: 9;
+      transform: translateX(-50%);
+      max-width: min(720px, calc(100vw - 30px));
+      padding: 7px 11px;
+      border: 1px solid rgba(244, 234, 215, .14);
+      border-radius: 7px;
+      background: rgba(12, 12, 10, .68);
+      color: #decfae;
+      font-size: 12px;
+      line-height: 1.45;
+      text-align: center;
+      pointer-events: none;
+      backdrop-filter: blur(10px);
+    }
+
+    @media (max-width: 1080px) {
+      .right-panel {
+        top: auto;
+        bottom: 92px;
+        max-height: 38vh;
+      }
+
+      .flag-strip {
+        display: none;
+      }
+
+      .camera-dock {
+        top: 210px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .topbar {
+        grid-template-columns: 1fr;
+        padding: 12px;
+      }
+
+      .date-readout {
+        justify-self: start;
+        min-width: 112px;
+      }
+
+      .right-panel {
+        display: none;
+      }
+
+      .camera-dock {
+        top: auto;
+        bottom: 136px;
+        width: calc(100vw - 20px);
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .bottom-console {
+        grid-template-columns: auto 1fr;
+        gap: 8px;
+        padding: 8px;
+      }
+
+      .speed-group {
+        grid-column: 1 / 2;
+        grid-row: 2;
+        justify-content: start;
+      }
+
+      .mode-group {
+        grid-column: 2 / 3;
+        grid-row: 2;
+        justify-content: end;
+      }
+
+      .speed-btn {
+        min-width: 39px;
+        padding: 0 6px;
+      }
+
+      .mode-btn {
+        min-width: 54px;
+        padding: 0 8px;
+      }
+
+      .timeline-wrap {
+        min-width: 0;
+      }
+
+      .status-line {
+        bottom: 206px;
+        font-size: 11px;
+      }
+
+      .legend {
+        max-height: 58px;
+        overflow: hidden;
+      }
+
+      .scene-label.map-country {
+        font-size: 10px;
+        padding: 2px 5px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main id="app">
+    <canvas id="theater"></canvas>
+    <div id="labelLayer"></div>
+
+    <section class="hud panel topbar" aria-label="戰情總覽">
+      <div class="title">
+        <h1>第二次世界大戰 3D 戰情室</h1>
+        <div class="subtitle">互動式戰略沙盤，結合地形、軍勢移動、戰力、將領、船艦與戰術特效。</div>
+      </div>
+      <div class="date-readout">
+        <strong id="yearReadout">1939</strong>
+        <span id="dateReadout">09.01</span>
+      </div>
+      <div class="legend">
+        <span class="legend-item"><i class="dot blue"></i>藍方 同盟國</span>
+        <span class="legend-item"><i class="dot red"></i>紅方 軸心國</span>
+        <span class="legend-item"><i class="dot green"></i>綠色 中立</span>
+      </div>
+    </section>
+
+    <div class="flag-strip" id="flagStrip" aria-label="主要軍旗"></div>
+
+    <nav class="hud panel camera-dock" aria-label="鏡頭">
+      <button class="icon-btn active" data-camera="world" title="全球">全球</button>
+      <button class="icon-btn" data-camera="europe" title="歐洲">歐洲</button>
+      <button class="icon-btn" data-camera="pacific" title="太平洋">太平洋</button>
+      <button class="icon-btn" data-camera="africa" title="北非">北非</button>
+    </nav>
+
+    <aside class="hud panel right-panel" aria-label="戰情事件">
+      <div class="briefing">
+        <p class="eyebrow" id="theaterName">Europe Theater</p>
+        <h2 id="eventTitle">德軍入侵波蘭</h2>
+        <p id="eventSummary">裝甲與空軍同步突破邊境，波蘭防線被迫向華沙收縮。</p>
+        <div class="intel-grid">
+          <div class="intel"><span>將領</span><b id="leaders">希特勒、波克、里茲-希米格維</b></div>
+          <div class="intel"><span>陣型</span><b id="formation">裝甲楔形突進</b></div>
+          <div class="intel"><span>戰力</span><b id="strength">藍方 95萬｜紅方 150萬</b></div>
+          <div class="intel"><span>計策與天氣</span><b id="tactic">閃電戰｜晴朗</b></div>
+        </div>
+      </div>
+      <div class="event-list" id="eventList"></div>
+    </aside>
+
+    <div class="hud panel tactic-banner" id="tacticBanner">
+      <strong id="tacticText">計策發動</strong>
+    </div>
+
+    <div class="status-line" id="statusLine">戰區載入中</div>
+
+    <section class="hud panel bottom-console" aria-label="時間軸">
+      <button class="play-btn playing" id="playBtn" title="播放或暫停">
+        <span class="play-icon"></span>
+        <span class="pause-icon"></span>
+      </button>
+      <div class="speed-group" aria-label="播放速度">
+        <button class="speed-btn active" data-speed="0.08">1x</button>
+        <button class="speed-btn" data-speed="0.16">2x</button>
+        <button class="speed-btn" data-speed="0.28">4x</button>
+      </div>
+      <div class="timeline-wrap">
+        <input id="timeSlider" type="range" min="0" max="15.999" step="0.001" value="0" aria-label="戰爭時間軸">
+        <div class="ticks">
+          <span>1939</span>
+          <span>1940</span>
+          <span>1941</span>
+          <span>1942</span>
+          <span>1943</span>
+          <span>1944</span>
+          <span>1945</span>
+        </div>
+      </div>
+      <div class="mode-group" aria-label="模式">
+        <button class="mode-btn active" data-mode="auto">自動</button>
+        <button class="mode-btn" data-mode="manual">手動</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import * as THREE from "https://unpkg.com/three@0.164.1/build/three.module.js";
+
+    const canvas = document.getElementById("theater");
+    const labelLayer = document.getElementById("labelLayer");
+    const eventList = document.getElementById("eventList");
+    const playBtn = document.getElementById("playBtn");
+    const timeSlider = document.getElementById("timeSlider");
+    const tacticBanner = document.getElementById("tacticBanner");
+    const tacticText = document.getElementById("tacticText");
+    const statusLine = document.getElementById("statusLine");
+
+    const SIDE_COLORS = {
+      allied: new THREE.Color("#3ca7ff"),
+      axis: new THREE.Color("#ff4e42"),
+      neutral: new THREE.Color("#58d47b"),
+      terrain: new THREE.Color("#5d704f")
+    };
+
+    const WORLD = { width: 82, height: 42 };
+
+    const countries = {
+      usa: { name: "美國", short: "US", side: "allied", flag: "usa" },
+      uk: { name: "英國", short: "UK", side: "allied", flag: "uk" },
+      ussr: { name: "蘇聯", short: "蘇", side: "allied", flag: "ussr" },
+      china: { name: "中國", short: "中", side: "allied", flag: "china" },
+      france: { name: "法國", short: "法", side: "allied", flag: "france" },
+      poland: { name: "波蘭", short: "波", side: "allied", flag: "poland" },
+      germany: { name: "德國", short: "德", side: "axis", flag: "germany" },
+      japan: { name: "日本", short: "日", side: "axis", flag: "japan" },
+      italy: { name: "義大利", short: "義", side: "axis", flag: "italy" },
+      neutral: { name: "中立國", short: "中立", side: "neutral", flag: "neutral" }
+    };
+
+    const cities = [
+      { name: "倫敦", country: "uk", lon: -0.1, lat: 51.5 },
+      { name: "巴黎", country: "france", lon: 2.35, lat: 48.86 },
+      { name: "柏林", country: "germany", lon: 13.4, lat: 52.5 },
+      { name: "華沙", country: "poland", lon: 21.0, lat: 52.2 },
+      { name: "莫斯科", country: "ussr", lon: 37.6, lat: 55.7 },
+      { name: "史達林格勒", country: "ussr", lon: 44.5, lat: 48.7 },
+      { name: "羅馬", country: "italy", lon: 12.5, lat: 41.9 },
+      { name: "開羅", country: "uk", lon: 31.2, lat: 30.0 },
+      { name: "阿拉曼", country: "uk", lon: 28.9, lat: 30.8 },
+      { name: "東京", country: "japan", lon: 139.7, lat: 35.7 },
+      { name: "珍珠港", country: "usa", lon: -157.95, lat: 21.35 },
+      { name: "中途島", country: "usa", lon: -177.37, lat: 28.2 },
+      { name: "南京", country: "china", lon: 118.8, lat: 32.1 },
+      { name: "諾曼第", country: "france", lon: -0.7, lat: 49.3 },
+      { name: "柏林戰區", country: "germany", lon: 13.4, lat: 52.5 },
+      { name: "硫磺島", country: "japan", lon: 141.3, lat: 24.8 },
+      { name: "廣島", country: "japan", lon: 132.45, lat: 34.39 }
+    ];
+
+    const landMasses = [
+      { name: "北美洲", color: "#53684d", points: [[-168, 70], [-135, 72], [-116, 62], [-92, 58], [-60, 50], [-52, 28], [-78, 12], [-95, 16], [-116, 30], [-126, 47], [-150, 55]] },
+      { name: "南美洲", color: "#4d634b", points: [[-82, 12], [-54, 6], [-38, -8], [-45, -28], [-58, -55], [-72, -48], [-78, -18]] },
+      { name: "歐洲", color: "#68734f", points: [[-11, 36], [-6, 58], [10, 64], [31, 58], [42, 46], [32, 36], [12, 36], [2, 40]] },
+      { name: "非洲", color: "#695f43", points: [[-18, 35], [24, 34], [42, 12], [35, -30], [16, -35], [-6, -25], [-17, 5]] },
+      { name: "亞洲", color: "#61704c", points: [[31, 57], [62, 69], [107, 60], [142, 47], [151, 24], [126, 8], [95, 18], [78, 6], [50, 16], [35, 28], [30, 45]] },
+      { name: "東南亞", color: "#536e4e", points: [[94, 20], [116, 20], [123, 6], [112, -8], [97, -3]] },
+      { name: "澳洲", color: "#6e6546", points: [[112, -12], [154, -14], [151, -37], [121, -39], [111, -25]] },
+      { name: "格陵蘭", color: "#86967e", points: [[-53, 60], [-24, 69], [-32, 80], [-58, 82], [-73, 72]] },
+      { name: "英倫", color: "#70764f", points: [[-8, 50], [1, 51], [0, 58], [-7, 58], [-10, 54]] },
+      { name: "日本列島", color: "#60764f", points: [[130, 31], [144, 34], [146, 42], [138, 45], [130, 38]] }
+    ];
+
+    const mapCountryAreas = [
+      { name: "加拿大", side: "allied", label: [-104, 58], points: [[-141, 69], [-60, 64], [-55, 49], [-94, 50], [-122, 49], [-139, 58]] },
+      { name: "美國", side: "allied", label: [-99, 38], points: [[-124, 49], [-67, 47], [-70, 31], [-82, 25], [-98, 26], [-117, 32], [-125, 42]] },
+      { name: "墨西哥", side: "neutral", label: [-103, 23], points: [[-117, 32], [-97, 26], [-86, 18], [-93, 15], [-107, 19], [-114, 27]] },
+      { name: "巴西", side: "allied", label: [-53, -12], points: [[-70, 4], [-40, -5], [-38, -23], [-52, -35], [-65, -25], [-74, -8]] },
+      { name: "英國", side: "allied", label: [-3, 55], points: [[-8, 50], [1, 51], [0, 58], [-6, 59], [-10, 55]] },
+      { name: "法國", side: "allied", label: [2, 46], points: [[-5, 51], [8, 50], [7, 43], [1, 42], [-5, 46]] },
+      { name: "德國", side: "axis", label: [10, 51], points: [[6, 54], [15, 54], [15, 48], [8, 47], [6, 50]] },
+      { name: "波蘭", side: "allied", label: [20, 52], points: [[14, 54], [24, 54], [24, 49], [15, 49]] },
+      { name: "義大利", side: "axis", label: [13, 42], points: [[8, 46], [13, 46], [18, 39], [16, 37], [11, 42]] },
+      { name: "西班牙", side: "neutral", label: [-4, 40], points: [[-9, 44], [3, 44], [3, 36], [-7, 36], [-10, 40]] },
+      { name: "瑞士", side: "neutral", label: [8, 47], points: [[6, 48], [10, 48], [10, 46], [6, 46]] },
+      { name: "瑞典", side: "neutral", label: [15, 62], points: [[11, 69], [24, 67], [23, 56], [14, 55], [10, 61]] },
+      { name: "土耳其", side: "neutral", label: [35, 39], points: [[26, 42], [44, 41], [44, 36], [30, 36], [26, 39]] },
+      { name: "北非英軍區", side: "allied", label: [25, 29], points: [[-5, 33], [36, 33], [36, 22], [5, 22], [-5, 27]] },
+      { name: "蘇聯", side: "allied", label: [76, 58], points: [[30, 68], [56, 72], [104, 66], [150, 58], [149, 46], [95, 45], [55, 48], [32, 55]] },
+      { name: "印度", side: "allied", label: [78, 22], points: [[68, 31], [90, 29], [88, 8], [76, 7], [68, 20]] },
+      { name: "中國", side: "allied", label: [105, 35], points: [[75, 45], [110, 45], [123, 32], [110, 20], [86, 24], [74, 34]] },
+      { name: "日本", side: "axis", label: [139, 38], points: [[130, 31], [144, 34], [146, 42], [138, 45], [130, 38]] },
+      { name: "東南亞", side: "axis", label: [105, 12], points: [[94, 20], [118, 20], [124, 6], [111, -8], [96, -2]] },
+      { name: "澳洲", side: "allied", label: [134, -25], points: [[112, -12], [154, -14], [151, -37], [121, -39], [111, -25]] }
+    ];
+
+    const mapCountryLabels = [
+      { name: "美國", side: "allied", lon: -99, lat: 38 },
+      { name: "英國", side: "allied", lon: -3, lat: 55 },
+      { name: "法國", side: "allied", lon: 2, lat: 46 },
+      { name: "德國", side: "axis", lon: 10, lat: 51 },
+      { name: "波蘭", side: "allied", lon: 20, lat: 52 },
+      { name: "義大利", side: "axis", lon: 13, lat: 42 },
+      { name: "蘇聯", side: "allied", lon: 76, lat: 58 },
+      { name: "中國", side: "allied", lon: 105, lat: 35 },
+      { name: "日本", side: "axis", lon: 139, lat: 38 },
+      { name: "西班牙", side: "neutral", lon: -4, lat: 40 },
+      { name: "瑞典", side: "neutral", lon: 15, lat: 62 },
+      { name: "土耳其", side: "neutral", lon: 35, lat: 39 },
+      { name: "澳洲", side: "allied", lon: 134, lat: -25 },
+      { name: "北非", side: "allied", lon: 25, lat: 29 }
+    ];
+
+    const events = [
+      {
+        date: "1939-09-01",
+        theater: "Europe Theater",
+        title: "德軍入侵波蘭",
+        summary: "裝甲兵團與空軍同步壓迫邊境，波蘭防線向華沙收縮，歐洲戰爭全面爆發。",
+        leaders: "希特勒、波克、里茲-希米格維",
+        formation: "裝甲楔形突進",
+        strength: "藍方 波蘭約95萬｜紅方 德軍約150萬",
+        tactic: "閃電戰",
+        weather: "晴朗",
+        focus: [19, 52],
+        camera: "europe",
+        status: "砲火壓制、空襲開路，紅方裝甲群高速推進。",
+        movements: [
+          { type: "army", country: "germany", side: "axis", label: "北方集團軍", from: [13, 53], to: [21, 53], status: "突進", formation: "wedge" },
+          { type: "army", country: "germany", side: "axis", label: "南方集團軍", from: [15, 49], to: [21, 51], status: "包抄", formation: "wedge" },
+          { type: "army", country: "poland", side: "allied", label: "波蘭守軍", from: [23, 52], to: [21, 52], status: "收縮", formation: "line" }
+        ],
+        effects: ["artillery", "blitz"]
+      },
+      {
+        date: "1940-05-10",
+        theater: "Western Front",
+        title: "法國戰役與敦克爾克",
+        summary: "紅方穿越阿登森林切斷盟軍正面，英法部隊向海岸撤退並展開大撤離。",
+        leaders: "曼施坦因、古德里安、魏剛、戈特",
+        formation: "穿插突破與海岸撤離",
+        strength: "藍方 英法約300萬｜紅方 德軍約330萬",
+        tactic: "鐮刀收割",
+        weather: "多雲",
+        focus: [3, 50],
+        camera: "europe",
+        status: "裝甲縱隊穿越森林，港口船隊承受空襲威脅。",
+        movements: [
+          { type: "army", country: "germany", side: "axis", label: "A集團軍", from: [7, 50], to: [2, 49], status: "突破", formation: "wedge" },
+          { type: "army", country: "france", side: "allied", label: "法軍防線", from: [3, 49], to: [-1, 49], status: "後撤", formation: "line" },
+          { type: "ship", country: "uk", side: "allied", label: "敦克爾克撤離船隊", from: [2, 51], to: [1, 51.5], status: "疏散", formation: "column" }
+        ],
+        effects: ["artillery", "smoke"]
+      },
+      {
+        date: "1940-09-07",
+        theater: "Battle of Britain",
+        title: "不列顛空戰",
+        summary: "紅方空軍集中轟炸倫敦，英國雷達、戰鬥機與防空火網守住制空權。",
+        leaders: "丘吉爾、道丁、戈林",
+        formation: "雷達警戒與扇形攔截",
+        strength: "藍方 RAF約700架｜紅方 Luftwaffe約2500架",
+        tactic: "防空攔截網",
+        weather: "低雲",
+        focus: [-0.1, 51.5],
+        camera: "europe",
+        status: "空中航跡交錯，城市周邊出現防空砲火與探照燈。",
+        movements: [
+          { type: "air", country: "germany", side: "axis", label: "轟炸機群", from: [7, 51], to: [-0.1, 51.5], status: "空襲", formation: "column" },
+          { type: "air", country: "uk", side: "allied", label: "戰鬥機司令部", from: [-2, 52], to: [1, 52], status: "攔截", formation: "line" }
+        ],
+        effects: ["artillery", "rain"]
+      },
+      {
+        date: "1941-06-22",
+        theater: "Eastern Front",
+        title: "巴巴羅薩作戰",
+        summary: "紅方三路進攻蘇聯，藍方縱深防禦與後勤消耗逐漸拖慢攻勢。",
+        leaders: "希特勒、哈爾德、史達林、朱可夫",
+        formation: "三路縱深突擊",
+        strength: "藍方 蘇軍約290萬｜紅方 軸心軍約380萬",
+        tactic: "縱深包圍",
+        weather: "夏季乾燥",
+        focus: [32, 54],
+        camera: "europe",
+        status: "紅方箭頭向列寧格勒、莫斯科與烏克蘭壓上。",
+        movements: [
+          { type: "army", country: "germany", side: "axis", label: "北方集團軍", from: [21, 54], to: [31, 58], status: "推進", formation: "wedge" },
+          { type: "army", country: "germany", side: "axis", label: "中央集團軍", from: [24, 53], to: [37, 55], status: "突擊", formation: "wedge" },
+          { type: "army", country: "germany", side: "axis", label: "南方集團軍", from: [25, 49], to: [36, 50], status: "包圍", formation: "arc" },
+          { type: "army", country: "ussr", side: "allied", label: "蘇軍預備隊", from: [41, 56], to: [37, 55], status: "反應", formation: "line" }
+        ],
+        effects: ["artillery", "blitz"]
+      },
+      {
+        date: "1941-12-07",
+        theater: "Pacific Theater",
+        title: "珍珠港襲擊",
+        summary: "日本機動艦隊突襲夏威夷，美國太平洋艦隊遭受重創，太平洋戰爭擴大。",
+        leaders: "山本五十六、南雲忠一、金梅爾",
+        formation: "航母突擊群",
+        strength: "藍方 美艦8艘主力艦｜紅方 日航母6艘",
+        tactic: "奇襲",
+        weather: "晴朗海面",
+        focus: [-157.95, 21.35],
+        camera: "pacific",
+        status: "艦隊雷達接觸、魚雷航跡與港內爆炸同時出現。",
+        movements: [
+          { type: "ship", country: "japan", side: "axis", label: "第一航空艦隊", from: [170, 38], to: [-157.95, 21.35], status: "奇襲", formation: "column" },
+          { type: "ship", country: "usa", side: "allied", label: "太平洋艦隊", from: [-157.8, 21.4], to: [-157.95, 21.35], status: "受損", formation: "line" }
+        ],
+        effects: ["artillery", "smoke"]
+      },
+      {
+        date: "1942-06-04",
+        theater: "Pacific Theater",
+        title: "中途島海戰",
+        summary: "美軍破譯情報後伏擊日本航母群，太平洋制海權出現轉折。",
+        leaders: "尼米茲、斯普魯恩斯、山本五十六、南雲忠一",
+        formation: "航母雙縱隊與偵察扇面",
+        strength: "藍方 美航母3艘｜紅方 日航母4艘",
+        tactic: "情報伏擊",
+        weather: "海霧",
+        focus: [-177.37, 28.2],
+        camera: "pacific",
+        status: "偵察扇面展開，俯衝轟炸造成紅方航母起火。",
+        movements: [
+          { type: "ship", country: "japan", side: "axis", label: "南雲機動部隊", from: [170, 32], to: [-177.37, 28.2], status: "起火", formation: "column" },
+          { type: "ship", country: "usa", side: "allied", label: "第16/17特遣艦隊", from: [-164, 25], to: [-177.37, 28.2], status: "反擊", formation: "arc" },
+          { type: "air", country: "usa", side: "allied", label: "艦載機攻擊隊", from: [-174, 27], to: [-177.37, 28.2], status: "俯衝", formation: "wedge" }
+        ],
+        effects: ["artillery", "fog", "smoke"]
+      },
+      {
+        date: "1942-10-23",
+        theater: "North Africa",
+        title: "第二次阿拉曼戰役",
+        summary: "藍方以砲兵、地雷突破與裝甲預備隊推動攻勢，北非戰局逆轉。",
+        leaders: "蒙哥馬利、隆美爾",
+        formation: "砲兵壓制後梯次突破",
+        strength: "藍方 英第8軍約19.5萬｜紅方 軸心約10.4萬",
+        tactic: "壓制突破",
+        weather: "沙塵",
+        focus: [28.9, 30.8],
+        camera: "africa",
+        status: "地雷帶被打開缺口，裝甲與步兵沿狹窄通道前進。",
+        movements: [
+          { type: "army", country: "uk", side: "allied", label: "英第8軍", from: [28, 30.6], to: [29.3, 30.8], status: "突破", formation: "line" },
+          { type: "army", country: "germany", side: "axis", label: "非洲軍", from: [29.8, 30.8], to: [29.3, 30.8], status: "防守", formation: "line" }
+        ],
+        effects: ["artillery", "dust"]
+      },
+      {
+        date: "1942-11-08",
+        theater: "Operation Torch",
+        title: "火炬行動",
+        summary: "英美聯軍在北非西部登陸，軸心軍被迫面對東西夾擊。",
+        leaders: "艾森豪、巴頓、安德森、凱塞林",
+        formation: "多點登陸",
+        strength: "藍方 登陸軍約10.7萬｜紅方 軸心/維希部隊分散",
+        tactic: "兩翼登陸包夾",
+        weather: "海風",
+        focus: [-5, 34],
+        camera: "africa",
+        status: "登陸箭頭自大西洋與地中海進入摩洛哥、阿爾及利亞。",
+        movements: [
+          { type: "ship", country: "usa", side: "allied", label: "西部登陸艦隊", from: [-20, 34], to: [-7, 34], status: "登陸", formation: "column" },
+          { type: "ship", country: "uk", side: "allied", label: "中部登陸艦隊", from: [-2, 38], to: [3, 36], status: "登陸", formation: "column" },
+          { type: "army", country: "germany", side: "axis", label: "突尼斯守軍", from: [10, 35], to: [8, 36], status: "增援", formation: "line" }
+        ],
+        effects: ["artillery", "rain"]
+      },
+      {
+        date: "1943-02-02",
+        theater: "Eastern Front",
+        title: "史達林格勒反包圍",
+        summary: "藍方兩翼突破並封閉包圍圈，紅方第6軍團在嚴寒與補給崩潰下投降。",
+        leaders: "朱可夫、華西列夫斯基、保盧斯",
+        formation: "鉗形包圍",
+        strength: "藍方 蘇軍約110萬｜紅方 軸心約100萬",
+        tactic: "天王星行動",
+        weather: "暴雪",
+        focus: [44.5, 48.7],
+        camera: "europe",
+        status: "雪線覆蓋伏爾加河，藍方鉗形箭頭閉合。",
+        movements: [
+          { type: "army", country: "ussr", side: "allied", label: "西北突擊群", from: [39, 50], to: [44, 49], status: "合圍", formation: "arc" },
+          { type: "army", country: "ussr", side: "allied", label: "南方突擊群", from: [42, 46], to: [44, 49], status: "合圍", formation: "arc" },
+          { type: "army", country: "germany", side: "axis", label: "第6軍團", from: [44.6, 48.7], to: [44.5, 48.7], status: "被圍", formation: "cluster" }
+        ],
+        effects: ["artillery", "snow", "smoke"]
+      },
+      {
+        date: "1943-07-10",
+        theater: "Mediterranean",
+        title: "西西里登陸",
+        summary: "盟軍自北非越海登陸西西里，義大利政局動搖，地中海戰線改寫。",
+        leaders: "艾森豪、蒙哥馬利、巴頓、墨索里尼",
+        formation: "兩翼登陸與島上推進",
+        strength: "藍方 約16萬首波｜紅方 義德約23萬",
+        tactic: "海空聯合登陸",
+        weather: "強風",
+        focus: [14, 37],
+        camera: "europe",
+        status: "登陸艇分波靠岸，島內防線產生煙幕與後撤標記。",
+        movements: [
+          { type: "ship", country: "uk", side: "allied", label: "英第8軍登陸群", from: [18, 33], to: [15, 37], status: "登陸", formation: "column" },
+          { type: "ship", country: "usa", side: "allied", label: "美第7軍登陸群", from: [10, 34], to: [13, 37], status: "登陸", formation: "column" },
+          { type: "army", country: "italy", side: "axis", label: "義德守軍", from: [14, 38], to: [15, 38], status: "後撤", formation: "line" }
+        ],
+        effects: ["artillery", "rain"]
+      },
+      {
+        date: "1944-06-06",
+        theater: "Western Front",
+        title: "諾曼第登陸",
+        summary: "英美加部隊跨海登陸，空降、海軍砲火與灘頭突破開啟西線反攻。",
+        leaders: "艾森豪、蒙哥馬利、隆美爾、倫德施泰特",
+        formation: "五灘頭登陸與空降縱深",
+        strength: "藍方 首日約15.6萬｜紅方 德軍約5萬局部防守",
+        tactic: "霸王行動",
+        weather: "陰雨轉晴",
+        focus: [-0.7, 49.3],
+        camera: "europe",
+        status: "海面艦砲閃光、灘頭煙幕與空降路徑同步亮起。",
+        movements: [
+          { type: "ship", country: "usa", side: "allied", label: "奧馬哈/猶他", from: [-4, 50.5], to: [-1.1, 49.4], status: "登陸", formation: "line" },
+          { type: "ship", country: "uk", side: "allied", label: "金/朱諾/劍", from: [-1, 50.6], to: [0.1, 49.3], status: "登陸", formation: "line" },
+          { type: "army", country: "germany", side: "axis", label: "大西洋壁壘", from: [0.6, 49.4], to: [-0.4, 49.4], status: "防守", formation: "line" },
+          { type: "air", country: "usa", side: "allied", label: "空降部隊", from: [-2, 50], to: [-0.8, 49.2], status: "空降", formation: "column" }
+        ],
+        effects: ["artillery", "rain", "smoke"]
+      },
+      {
+        date: "1944-06-22",
+        theater: "Eastern Front",
+        title: "巴格拉基昂行動",
+        summary: "蘇軍大規模攻勢摧毀德國中央集團軍群，東線向波蘭與德國本土逼近。",
+        leaders: "朱可夫、羅科索夫斯基、布施、莫德爾",
+        formation: "多正面突破",
+        strength: "藍方 蘇軍約240萬｜紅方 德軍約80萬",
+        tactic: "欺敵與縱深火力",
+        weather: "夏季雷雨",
+        focus: [28, 53],
+        camera: "europe",
+        status: "藍方炮火帶沿整條戰線推進，紅方中央戰線崩解。",
+        movements: [
+          { type: "army", country: "ussr", side: "allied", label: "白俄羅斯第1方面軍", from: [34, 53], to: [26, 53], status: "突破", formation: "line" },
+          { type: "army", country: "ussr", side: "allied", label: "波羅的海方面軍", from: [31, 57], to: [24, 56], status: "推進", formation: "wedge" },
+          { type: "army", country: "germany", side: "axis", label: "中央集團軍群", from: [29, 54], to: [24, 53], status: "崩退", formation: "cluster" }
+        ],
+        effects: ["artillery", "rain", "blitz"]
+      },
+      {
+        date: "1944-12-16",
+        theater: "Western Front",
+        title: "突出部之役",
+        summary: "德軍在阿登森林發起最後大規模反攻，盟軍穩住交通節點後恢復主動。",
+        leaders: "希特勒、蒙哥馬利、巴頓、莫德爾",
+        formation: "森林窄正面突穿",
+        strength: "藍方 盟軍約61萬｜紅方 德軍約45萬",
+        tactic: "雪霧突擊",
+        weather: "大雪與濃霧",
+        focus: [5.8, 50.1],
+        camera: "europe",
+        status: "雪霧遮蔽空軍，紅方突進形成弧形突出部。",
+        movements: [
+          { type: "army", country: "germany", side: "axis", label: "第5裝甲軍", from: [7, 50], to: [5, 50], status: "突穿", formation: "wedge" },
+          { type: "army", country: "usa", side: "allied", label: "巴斯托涅守軍", from: [5.7, 50], to: [5.7, 50], status: "堅守", formation: "cluster" },
+          { type: "army", country: "usa", side: "allied", label: "巴頓第3軍", from: [6, 48.5], to: [5.8, 50], status: "解圍", formation: "column" }
+        ],
+        effects: ["artillery", "snow", "smoke"]
+      },
+      {
+        date: "1945-02-19",
+        theater: "Pacific Theater",
+        title: "硫磺島戰役",
+        summary: "美軍登陸火山島，日軍地下陣地造成高強度消耗戰。",
+        leaders: "尼米茲、史密斯、栗林忠道",
+        formation: "灘頭推進與地下防禦",
+        strength: "藍方 美軍約7萬｜紅方 日軍約2.1萬",
+        tactic: "逐洞清剿",
+        weather: "火山灰與海風",
+        focus: [141.3, 24.8],
+        camera: "pacific",
+        status: "艦砲火力覆蓋海岸，島上據點以煙幕和火點呈現。",
+        movements: [
+          { type: "ship", country: "usa", side: "allied", label: "登陸艦隊", from: [138, 22], to: [141.3, 24.8], status: "登陸", formation: "line" },
+          { type: "army", country: "japan", side: "axis", label: "地下守備隊", from: [141.3, 24.9], to: [141.3, 24.8], status: "固守", formation: "cluster" }
+        ],
+        effects: ["artillery", "smoke", "dust"]
+      },
+      {
+        date: "1945-04-16",
+        theater: "Eastern Front",
+        title: "柏林戰役",
+        summary: "蘇軍以壓倒性火力包圍柏林，歐洲戰爭進入終局。",
+        leaders: "朱可夫、科涅夫、希特勒、魏德林",
+        formation: "雙方面軍鉗形會攻",
+        strength: "藍方 蘇軍約250萬｜紅方 德軍約76萬",
+        tactic: "探照燈與重砲突破",
+        weather: "春季雨泥",
+        focus: [13.4, 52.5],
+        camera: "europe",
+        status: "藍方火力圈收縮，城市中心顯示高強度砲擊。",
+        movements: [
+          { type: "army", country: "ussr", side: "allied", label: "白俄羅斯第1方面軍", from: [15, 52.6], to: [13.4, 52.5], status: "攻城", formation: "line" },
+          { type: "army", country: "ussr", side: "allied", label: "烏克蘭第1方面軍", from: [14, 51], to: [13.4, 52.5], status: "包圍", formation: "arc" },
+          { type: "army", country: "germany", side: "axis", label: "柏林守軍", from: [13.4, 52.5], to: [13.4, 52.5], status: "孤立", formation: "cluster" }
+        ],
+        effects: ["artillery", "rain", "smoke"]
+      },
+      {
+        date: "1945-08-15",
+        theater: "Pacific Theater",
+        title: "日本投降",
+        summary: "太平洋戰爭結束，第二次世界大戰走向全面停火與戰後重建。",
+        leaders: "昭和天皇、杜魯門、麥克阿瑟、史達林",
+        formation: "停火與佔領部署",
+        strength: "藍方 同盟國全面優勢｜紅方 日本本土戰力枯竭",
+        tactic: "封鎖、空襲與外交壓力",
+        weather: "夏季晴",
+        focus: [139.7, 35.7],
+        camera: "pacific",
+        status: "紅方旗標轉為停火狀態，艦隊航線停止推進。",
+        movements: [
+          { type: "ship", country: "usa", side: "allied", label: "第3艦隊", from: [150, 32], to: [140, 35], status: "停火監控", formation: "line" },
+          { type: "army", country: "japan", side: "axis", label: "本土守備", from: [139.7, 35.7], to: [139.7, 35.7], status: "投降", formation: "cluster" },
+          { type: "army", country: "ussr", side: "allied", label: "遠東方面軍", from: [131, 45], to: [126, 43], status: "進入滿洲", formation: "wedge" }
+        ],
+        effects: ["fog"]
+      }
+    ];
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x11100d, 0.014);
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+      powerPreference: "high-performance"
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 600);
+    const cameraRig = {
+      target: new THREE.Vector3(0, 0, 0),
+      radius: 52,
+      theta: -0.85,
+      phi: 0.82,
+      desired: null
+    };
+
+    const root = new THREE.Group();
+    scene.add(root);
+
+    const mapGroup = new THREE.Group();
+    const cityGroup = new THREE.Group();
+    const unitGroup = new THREE.Group();
+    const effectGroup = new THREE.Group();
+    const weatherGroup = new THREE.Group();
+    root.add(mapGroup, cityGroup, unitGroup, effectGroup, weatherGroup);
+
+    const labels = [];
+    let eventLabels = [];
+    let activeUnits = [];
+    let activeEffects = [];
+    let weatherParticles = null;
+    let currentIndex = -1;
+    let timeline = 0;
+    let autoplay = true;
+    let speed = 0.08;
+    let lastFrame = performance.now();
+    let bannerTimer = 0;
+
+    const tempVec = new THREE.Vector3();
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+
+    initLights();
+    initMap();
+    initCities();
+    initFlags();
+    initEvents();
+    setCameraPreset("world", false);
+    setTimeline(0, true);
+    resize();
+    requestAnimationFrame(animate);
+
+    function initLights() {
+      const hemi = new THREE.HemisphereLight(0xfff1cf, 0x17222a, 1.7);
+      scene.add(hemi);
+
+      const sun = new THREE.DirectionalLight(0xffdf9f, 2.6);
+      sun.position.set(-22, 34, 18);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      scene.add(sun);
+
+      const blueFill = new THREE.PointLight(0x3ca7ff, 25, 95, 1.2);
+      blueFill.position.set(-28, 15, -22);
+      scene.add(blueFill);
+
+      const redFill = new THREE.PointLight(0xff4e42, 18, 80, 1.4);
+      redFill.position.set(24, 12, 18);
+      scene.add(redFill);
+    }
+
+    function initMap() {
+      const ocean = new THREE.Mesh(
+        new THREE.PlaneGeometry(WORLD.width, WORLD.height, 96, 48),
+        new THREE.MeshStandardMaterial({
+          color: 0x14384b,
+          roughness: 0.72,
+          metalness: 0.08,
+          emissive: 0x071821,
+          emissiveIntensity: 0.22
+        })
+      );
+      ocean.rotation.x = -Math.PI / 2;
+      ocean.receiveShadow = true;
+      mapGroup.add(ocean);
+
+      const oceanGrid = new THREE.GridHelper(WORLD.width, 36, 0xb99a52, 0x35555f);
+      oceanGrid.position.y = 0.035;
+      oceanGrid.material.transparent = true;
+      oceanGrid.material.opacity = 0.22;
+      mapGroup.add(oceanGrid);
+
+      landMasses.forEach((land) => {
+        const shape = new THREE.Shape();
+        land.points.forEach((point, index) => {
+          const p = geoToWorld(point[0], point[1], 0.08);
+          if (index === 0) shape.moveTo(p.x, p.z);
+          else shape.lineTo(p.x, p.z);
+        });
+        shape.closePath();
+
+        const geo = new THREE.ShapeGeometry(shape);
+        const mesh = new THREE.Mesh(
+          geo,
+          new THREE.MeshStandardMaterial({
+            color: land.color,
+            roughness: 0.84,
+            metalness: 0.04,
+            emissive: 0x111208,
+            emissiveIntensity: 0.1
+          })
+        );
+        mesh.rotation.x = Math.PI / 2;
+        mesh.position.y = 0.12;
+        mesh.receiveShadow = true;
+        mesh.castShadow = true;
+        mapGroup.add(mesh);
+
+        const line = makePolyline(land.points, 0xbfa15b, 0.26, 0.18);
+        line.position.y = 0.18;
+        mapGroup.add(line);
+      });
+
+      addPoliticalMapOverlay();
+
+      addMountainRange("阿爾卑斯", [[6, 46], [10, 47], [14, 46.5]], 0.8);
+      addMountainRange("喜馬拉雅", [[74, 32], [84, 29], [94, 28]], 1.2);
+      addMountainRange("洛磯山脈", [[-123, 50], [-116, 42], [-110, 35]], 0.9);
+      addMountainRange("撒哈拉沙丘", [[-5, 23], [12, 21], [25, 24]], 0.5, 0xc6a35d);
+
+      addNeutralZone("瑞士", 8.2, 46.8);
+      addNeutralZone("西班牙", -3.8, 40.2);
+      addNeutralZone("土耳其", 35, 39);
+      addNeutralZone("瑞典", 15, 62);
+      addMapCountryLabels();
+    }
+
+    function initCities() {
+      cities.forEach((city) => {
+        const country = countries[city.country] || countries.neutral;
+        const pos = geoToWorld(city.lon, city.lat, 0.45);
+        const marker = new THREE.Group();
+        marker.position.copy(pos);
+
+        const mat = new THREE.MeshStandardMaterial({
+          color: SIDE_COLORS[country.side],
+          emissive: SIDE_COLORS[country.side],
+          emissiveIntensity: 0.35,
+          metalness: 0.15,
+          roughness: 0.45
+        });
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 0.24, 18), mat);
+        base.castShadow = true;
+        marker.add(base);
+
+        const halo = new THREE.Mesh(
+          new THREE.TorusGeometry(0.32, 0.012, 8, 36),
+          new THREE.MeshBasicMaterial({ color: SIDE_COLORS[country.side], transparent: true, opacity: 0.72 })
+        );
+        halo.rotation.x = Math.PI / 2;
+        halo.position.y = -0.09;
+        marker.add(halo);
+
+        cityGroup.add(marker);
+        addLabel(marker, `${city.name}`, "scene-label city");
+      });
+    }
+
+    function initFlags() {
+      const strip = document.getElementById("flagStrip");
+      const order = ["usa", "uk", "ussr", "china", "france", "poland", "germany", "japan", "italy", "neutral"];
+      strip.innerHTML = order.map((key) => {
+        const country = countries[key];
+        return `<span class="flag-chip"><i class="mini-flag ${country.flag}"></i>${country.name}</span>`;
+      }).join("");
+    }
+
+    function initEvents() {
+      timeSlider.max = `${events.length - 0.001}`;
+      eventList.innerHTML = events.map((event, index) => {
+        const year = event.date.slice(0, 4);
+        const date = event.date.slice(5).replace("-", ".");
+        return `
+          <button class="event-card" data-index="${index}">
+            <span class="when">${year}<br>${date}</span>
+            <span>
+              <span class="what">${event.title}</span>
+              <span class="who">${event.theater}｜${event.tactic}</span>
+            </span>
+          </button>
+        `;
+      }).join("");
+
+      eventList.querySelectorAll(".event-card").forEach((button) => {
+        button.addEventListener("click", () => {
+          autoplay = false;
+          playBtn.classList.remove("playing");
+          setMode("manual");
+          setTimeline(Number(button.dataset.index), true);
+        });
+      });
+
+      playBtn.addEventListener("click", () => {
+        autoplay = !autoplay;
+        playBtn.classList.toggle("playing", autoplay);
+        setMode(autoplay ? "auto" : "manual");
+      });
+
+      timeSlider.addEventListener("input", () => {
+        autoplay = false;
+        playBtn.classList.remove("playing");
+        setMode("manual");
+        setTimeline(Number(timeSlider.value), true);
+      });
+
+      document.querySelectorAll(".speed-btn").forEach((button) => {
+        button.addEventListener("click", () => {
+          document.querySelectorAll(".speed-btn").forEach((b) => b.classList.remove("active"));
+          button.classList.add("active");
+          speed = Number(button.dataset.speed);
+        });
+      });
+
+      document.querySelectorAll(".mode-btn").forEach((button) => {
+        button.addEventListener("click", () => {
+          const auto = button.dataset.mode === "auto";
+          autoplay = auto;
+          playBtn.classList.toggle("playing", autoplay);
+          setMode(auto ? "auto" : "manual");
+        });
+      });
+
+      document.querySelectorAll("[data-camera]").forEach((button) => {
+        button.addEventListener("click", () => {
+          setCameraPreset(button.dataset.camera, true);
+          document.querySelectorAll("[data-camera]").forEach((b) => b.classList.remove("active"));
+          button.classList.add("active");
+        });
+      });
+
+      canvas.addEventListener("pointerdown", onPointerDown);
+      canvas.addEventListener("wheel", onWheel, { passive: false });
+      canvas.addEventListener("pointermove", onPointerHover);
+      window.addEventListener("resize", resize);
+    }
+
+    function setMode(mode) {
+      document.querySelectorAll(".mode-btn").forEach((button) => {
+        button.classList.toggle("active", button.dataset.mode === mode);
+      });
+    }
+
+    function setTimeline(value, forceLoad = false) {
+      timeline = Math.max(0, Math.min(events.length - 0.001, value));
+      const nextIndex = Math.min(events.length - 1, Math.floor(timeline));
+      const progress = timeline - nextIndex;
+
+      if (forceLoad || nextIndex !== currentIndex) {
+        loadEvent(nextIndex);
+      }
+      updateEventProgress(progress);
+      timeSlider.value = `${timeline}`;
+    }
+
+    function loadEvent(index) {
+      currentIndex = index;
+      const event = events[index];
+
+      unitGroup.clear();
+      effectGroup.clear();
+      weatherGroup.clear();
+      activeUnits = [];
+      activeEffects = [];
+      clearEventLabels();
+
+      document.getElementById("theaterName").textContent = event.theater;
+      document.getElementById("eventTitle").textContent = event.title;
+      document.getElementById("eventSummary").textContent = event.summary;
+      document.getElementById("leaders").textContent = event.leaders;
+      document.getElementById("formation").textContent = event.formation;
+      document.getElementById("strength").textContent = event.strength;
+      document.getElementById("tactic").textContent = `${event.tactic}｜${event.weather}`;
+      document.getElementById("yearReadout").textContent = event.date.slice(0, 4);
+      document.getElementById("dateReadout").textContent = event.date.slice(5).replace("-", ".");
+      statusLine.textContent = event.status;
+
+      eventList.querySelectorAll(".event-card").forEach((card, cardIndex) => {
+        card.classList.toggle("active", cardIndex === index);
+      });
+
+      if (autoplay) setCameraPreset(event.camera, true, event.focus);
+      showTactic(event.tactic);
+      createEventUnits(event);
+      createWeather(event);
+      createEventEffects(event);
+    }
+
+    function createEventUnits(event) {
+      event.movements.forEach((move, index) => {
+        const country = countries[move.country] || countries.neutral;
+        const from = geoToWorld(move.from[0], move.from[1], move.type === "air" ? 3 : 0.62);
+        const to = geoToWorld(move.to[0], move.to[1], move.type === "air" ? 3.2 : 0.62);
+        const color = SIDE_COLORS[move.side];
+
+        const route = createArrow(from, to, color, move.type === "air" ? 1.3 : 0.45, move.type);
+        unitGroup.add(route);
+
+        const unit = createUnitMesh(move, country);
+        unit.position.copy(from);
+        unitGroup.add(unit);
+        activeUnits.push({ unit, from, to, move, color, pulse: Math.random() * 10 });
+
+        const label = addLabel(
+          unit,
+          unitLabelHTML(country, move),
+          "scene-label unit-label",
+          true,
+          unitLabelOffset(index, event.movements.length)
+        );
+        eventLabels.push(label);
+        if (move.status.includes("受損") || move.status.includes("起火") || move.status.includes("被圍") || move.status.includes("孤立")) {
+          addSmokeEmitter(unit);
+        }
+      });
+    }
+
+    function createUnitMesh(move, country) {
+      const sideColor = SIDE_COLORS[move.side];
+      const group = new THREE.Group();
+      group.userData.clickable = true;
+      group.userData.name = `${country.name} ${move.label}`;
+
+      if (move.type === "ship") {
+        createShipMiniature(group, sideColor);
+        addFlagPlane(group, country.flag, 0.32, 0.54, { x: -0.42, z: -0.25 });
+      } else if (move.type === "air") {
+        createPlaneMiniature(group, sideColor);
+        addFlagPlane(group, country.flag, 0.18, 0.36, { x: -0.46, z: -0.28 });
+      } else {
+        createSoldierFormation(group, move.formation, sideColor);
+        addFlagPlane(group, country.flag, 0.72, 0.78, { x: -0.54, z: -0.42 });
+      }
+
+      return group;
+    }
+
+    function createShipMiniature(group, color) {
+      const hullMat = unitMaterial(color, 0.26, 0.48, 0.24);
+      const deckMat = unitMaterial(color.clone().lerp(new THREE.Color("#ffffff"), 0.22), 0.18, 0.42, 0.16);
+      const gunMat = new THREE.MeshStandardMaterial({ color: 0xe6d3a0, roughness: 0.35, metalness: 0.45 });
+
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.18, 0.26), hullMat);
+      hull.position.y = 0.04;
+      hull.castShadow = true;
+      group.add(hull);
+
+      const bow = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.3, 4), hullMat);
+      bow.rotation.z = -Math.PI / 2;
+      bow.rotation.y = Math.PI / 4;
+      bow.position.set(0.5, 0.04, 0);
+      bow.castShadow = true;
+      group.add(bow);
+
+      const stern = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.24), hullMat);
+      stern.position.set(-0.48, 0.05, 0);
+      stern.castShadow = true;
+      group.add(stern);
+
+      const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.2, 0.2), deckMat);
+      cabin.position.set(-0.08, 0.24, 0);
+      cabin.castShadow = true;
+      group.add(cabin);
+
+      const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.17, 0.16), deckMat);
+      bridge.position.set(-0.05, 0.42, 0);
+      bridge.castShadow = true;
+      group.add(bridge);
+
+      [-0.25, 0.28].forEach((x) => {
+        const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.06, 14), gunMat);
+        turret.position.set(x, 0.23, 0);
+        turret.rotation.x = Math.PI / 2;
+        group.add(turret);
+
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.28, 8), gunMat);
+        barrel.rotation.z = Math.PI / 2;
+        barrel.position.set(x + 0.16, 0.25, 0);
+        group.add(barrel);
+      });
+
+      const wake = new THREE.Mesh(
+        new THREE.RingGeometry(0.34, 0.42, 36),
+        new THREE.MeshBasicMaterial({ color: 0x91d8ff, transparent: true, opacity: 0.2, side: THREE.DoubleSide })
+      );
+      wake.scale.set(1.7, 0.42, 1);
+      wake.rotation.x = Math.PI / 2;
+      wake.position.set(-0.28, -0.06, 0);
+      group.add(wake);
+      group.scale.setScalar(1.18);
+    }
+
+    function createPlaneMiniature(group, color) {
+      const planeMat = unitMaterial(color, 0.38, 0.34, 0.3);
+      const glassMat = new THREE.MeshBasicMaterial({ color: 0xd8f5ff, transparent: true, opacity: 0.72 });
+
+      const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.095, 0.86, 16), planeMat);
+      fuselage.rotation.z = Math.PI / 2;
+      fuselage.castShadow = true;
+      group.add(fuselage);
+
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(0.095, 0.22, 16), planeMat);
+      nose.rotation.z = -Math.PI / 2;
+      nose.position.x = 0.52;
+      nose.castShadow = true;
+      group.add(nose);
+
+      const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 8), glassMat);
+      cockpit.scale.set(1.25, 0.55, 0.8);
+      cockpit.position.set(0.14, 0.08, 0);
+      group.add(cockpit);
+
+      const mainWing = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.025, 0.92), planeMat);
+      mainWing.position.set(0.02, -0.005, 0);
+      mainWing.castShadow = true;
+      group.add(mainWing);
+
+      const tailWing = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.02, 0.42), planeMat);
+      tailWing.position.set(-0.38, 0, 0);
+      tailWing.castShadow = true;
+      group.add(tailWing);
+
+      const fin = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.2, 3), planeMat);
+      fin.rotation.x = Math.PI / 2;
+      fin.position.set(-0.36, 0.13, 0);
+      fin.castShadow = true;
+      group.add(fin);
+
+      const prop = new THREE.Mesh(
+        new THREE.BoxGeometry(0.025, 0.5, 0.025),
+        new THREE.MeshBasicMaterial({ color: 0xf4e2a8, transparent: true, opacity: 0.72 })
+      );
+      prop.position.set(0.65, 0, 0);
+      prop.rotation.x = Math.PI / 2;
+      group.add(prop);
+      group.scale.setScalar(1.28);
+    }
+
+    function createSoldierFormation(group, formation, color) {
+      const pad = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.36, 0.42, 0.06, 28),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.16 })
+      );
+      pad.position.y = -0.03;
+      group.add(pad);
+
+      const points = formationPoints(formation);
+      points.forEach(([x, z], index) => {
+        const soldier = createSoldierMiniature(color, index);
+        soldier.position.set(x, 0.02, z);
+        soldier.rotation.y = (index - 2) * 0.12;
+        group.add(soldier);
+      });
+      group.scale.setScalar(1.16);
+    }
+
+    function createSoldierMiniature(color, index) {
+      const soldier = new THREE.Group();
+      const uniform = unitMaterial(color, 0.26, 0.52, 0.1);
+      const darkUniform = unitMaterial(color.clone().multiplyScalar(0.72), 0.18, 0.6, 0.08);
+      const skin = new THREE.MeshStandardMaterial({ color: 0xd8b083, roughness: 0.62, metalness: 0.03 });
+      const steel = new THREE.MeshStandardMaterial({ color: 0x2f3433, roughness: 0.45, metalness: 0.35 });
+
+      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.18, 5, 10), uniform);
+      body.position.y = 0.31;
+      body.castShadow = true;
+      soldier.add(body);
+
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.065, 14, 10), skin);
+      head.position.y = 0.52;
+      head.castShadow = true;
+      soldier.add(head);
+
+      const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.073, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), darkUniform);
+      helmet.position.y = 0.565;
+      helmet.castShadow = true;
+      soldier.add(helmet);
+
+      const leftLeg = limbMesh(darkUniform, 0.045, 0.18);
+      leftLeg.position.set(-0.035, 0.12, 0);
+      soldier.add(leftLeg);
+
+      const rightLeg = limbMesh(darkUniform, 0.045, 0.18);
+      rightLeg.position.set(0.035, 0.12, 0);
+      soldier.add(rightLeg);
+
+      const leftArm = limbMesh(uniform, 0.032, 0.18);
+      leftArm.position.set(-0.09, 0.34, 0);
+      leftArm.rotation.z = 0.42;
+      soldier.add(leftArm);
+
+      const rightArm = limbMesh(uniform, 0.032, 0.18);
+      rightArm.position.set(0.09, 0.34, 0);
+      rightArm.rotation.z = -0.72;
+      soldier.add(rightArm);
+
+      const rifle = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.32, 8), steel);
+      rifle.position.set(0.13, 0.35, 0.08);
+      rifle.rotation.z = Math.PI / 2.7;
+      rifle.rotation.x = 0.4;
+      soldier.add(rifle);
+
+      const pack = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.055), darkUniform);
+      pack.position.set(0, 0.32, -0.075);
+      soldier.add(pack);
+
+      const scale = index === 2 ? 1.24 : 1.08;
+      soldier.scale.setScalar(scale);
+      return soldier;
+    }
+
+    function limbMesh(material, radius, length) {
+      const limb = new THREE.Mesh(new THREE.CapsuleGeometry(radius, length, 4, 8), material);
+      limb.castShadow = true;
+      return limb;
+    }
+
+    function unitMaterial(color, emissiveIntensity = 0.24, roughness = 0.46, metalness = 0.18) {
+      return new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity,
+        roughness,
+        metalness
+      });
+    }
+
+    function createFormationDots(group, formation, color) {
+      const mat = new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: 0.2,
+        roughness: 0.55
+      });
+      let points = [];
+      if (formation === "wedge") points = [[-.42, -.25], [-.18, -.1], [.08, .05], [-.18, .2], [-.42, .36]];
+      else if (formation === "arc") points = [[-.42, -.25], [-.2, -.08], [0, 0], [-.2, .08], [-.42, .25]];
+      else if (formation === "cluster") points = [[-.2, -.18], [.05, -.15], [.18, .05], [-.05, .15], [-.28, .06]];
+      else if (formation === "column") points = [[-.46, 0], [-.24, 0], [0, 0], [.24, 0], [.46, 0]];
+      else points = [[-.38, -.2], [-.16, -.2], [.08, -.2], [.32, -.2], [.52, -.2]];
+
+      points.forEach(([x, z]) => {
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 8), mat);
+        dot.position.set(x, 0.18, z);
+        dot.castShadow = true;
+        group.add(dot);
+      });
+    }
+
+    function formationPoints(formation) {
+      if (formation === "wedge") return [[-.34, -.24], [-.12, -.07], [.16, .06], [-.12, .2], [-.34, .38]];
+      if (formation === "arc") return [[-.34, -.28], [-.1, -.09], [.14, 0], [-.1, .09], [-.34, .28]];
+      if (formation === "cluster") return [[-.18, -.19], [.1, -.16], [.22, .07], [-.05, .19], [-.28, .05]];
+      if (formation === "column") return [[-.4, 0], [-.2, 0], [0, 0], [.2, 0], [.4, 0]];
+      return [[-.34, -.18], [-.12, -.18], [.1, -.18], [.32, -.18], [.52, -.18]];
+    }
+
+    function addFlagPlane(group, flag, y, height, offset = { x: -0.2, z: -0.18 }) {
+      const pole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.012, 0.012, height, 8),
+        new THREE.MeshStandardMaterial({ color: 0xd6b15e, roughness: 0.42, metalness: 0.5 })
+      );
+      pole.position.set(offset.x, y + height / 2 - 0.08, offset.z);
+      group.add(pole);
+
+      const tex = makeFlagTexture(flag);
+      const flagMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.36, 0.22),
+        new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, transparent: true })
+      );
+      flagMesh.position.set(offset.x + 0.18, y + height - 0.1, offset.z);
+      flagMesh.rotation.y = -0.18;
+      group.add(flagMesh);
+    }
+
+    function unitLabelHTML(country, move) {
+      return `<i class="mini-flag ${country.flag}"></i><span>${move.label}<br><small>${country.name}｜${move.status}</small></span>`;
+    }
+
+    function createArrow(from, to, color, lift, type) {
+      const group = new THREE.Group();
+      const start = from.clone();
+      const end = to.clone();
+      const mid = start.clone().lerp(end, 0.5);
+      mid.y += lift;
+
+      const points = [start, mid, end];
+      const curve = new THREE.CatmullRomCurve3(points);
+      const curvePoints = curve.getPoints(48);
+      const geo = new THREE.BufferGeometry().setFromPoints(curvePoints);
+      const material = new THREE.LineBasicMaterial({
+        color,
+        transparent: true,
+        opacity: type === "air" ? 0.9 : 0.76
+      });
+      const line = new THREE.Line(geo, material);
+      group.add(line);
+
+      for (let i = 8; i < curvePoints.length; i += 10) {
+        const p = curvePoints[i];
+        const next = curvePoints[Math.min(i + 1, curvePoints.length - 1)];
+        const cone = new THREE.Mesh(
+          new THREE.ConeGeometry(type === "air" ? 0.11 : 0.16, type === "air" ? 0.34 : 0.42, 16),
+          new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.88 })
+        );
+        cone.position.copy(p);
+        orientAlong(cone, next.clone().sub(p));
+        group.add(cone);
+      }
+
+      return group;
+    }
+
+    function createEventEffects(event) {
+      const center = geoToWorld(event.focus[0], event.focus[1], 0.7);
+
+      if (event.effects.includes("blitz")) {
+        for (let i = 0; i < 3; i++) {
+          const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(0.8 + i * 0.35, 0.018, 8, 96),
+            new THREE.MeshBasicMaterial({
+              color: 0xffd86b,
+              transparent: true,
+              opacity: 0.85 - i * 0.18
+            })
+          );
+          ring.position.copy(center);
+          ring.position.y += 0.08 + i * 0.05;
+          ring.rotation.x = Math.PI / 2;
+          ring.userData.effect = "ring";
+          ring.userData.phase = i * 0.7;
+          effectGroup.add(ring);
+          activeEffects.push(ring);
+        }
+      }
+
+      if (event.effects.includes("artillery")) {
+        for (let i = 0; i < 12; i++) {
+          const pos = center.clone();
+          pos.x += (Math.random() - 0.5) * 2.1;
+          pos.z += (Math.random() - 0.5) * 1.3;
+          const burst = createBurst(pos, i * 0.18);
+          effectGroup.add(burst);
+          activeEffects.push(burst);
+        }
+      }
+
+      if (event.effects.includes("smoke")) {
+        for (let i = 0; i < 8; i++) {
+          const p = center.clone();
+          p.x += (Math.random() - 0.5) * 1.8;
+          p.z += (Math.random() - 0.5) * 1.2;
+          const smoke = createSmokePuff(p, Math.random() * 2);
+          effectGroup.add(smoke);
+          activeEffects.push(smoke);
+        }
+      }
+
+      if (event.effects.includes("dust")) {
+        for (let i = 0; i < 10; i++) {
+          const p = center.clone();
+          p.x += (Math.random() - 0.5) * 1.8;
+          p.z += (Math.random() - 0.5) * 1.4;
+          const dust = createDustPuff(p, Math.random() * 2);
+          effectGroup.add(dust);
+          activeEffects.push(dust);
+        }
+      }
+    }
+
+    function createWeather(event) {
+      const effect = event.effects.find((item) => ["snow", "rain", "fog", "dust"].includes(item));
+      if (!effect) return;
+
+      const count = effect === "fog" ? 140 : 220;
+      const positions = new Float32Array(count * 3);
+      const focus = geoToWorld(event.focus[0], event.focus[1], 0);
+      for (let i = 0; i < count; i++) {
+        positions[i * 3 + 0] = focus.x + (Math.random() - 0.5) * 9;
+        positions[i * 3 + 1] = 1 + Math.random() * (effect === "fog" ? 3.8 : 6.2);
+        positions[i * 3 + 2] = focus.z + (Math.random() - 0.5) * 6.6;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      const mat = new THREE.PointsMaterial({
+        color: effect === "snow" ? 0xeaf7ff : effect === "rain" ? 0x85b9ff : effect === "dust" ? 0xd2a35e : 0xcfd6cf,
+        size: effect === "fog" ? 0.28 : 0.12,
+        transparent: true,
+        opacity: effect === "fog" ? 0.28 : 0.74,
+        depthWrite: false
+      });
+      weatherParticles = new THREE.Points(geo, mat);
+      weatherParticles.userData.effect = effect;
+      weatherParticles.userData.focus = focus;
+      weatherGroup.add(weatherParticles);
+    }
+
+    function createBurst(pos, delay) {
+      const group = new THREE.Group();
+      group.position.copy(pos);
+      group.userData.effect = "burst";
+      group.userData.delay = delay;
+      group.userData.age = 0;
+
+      const core = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 18, 12),
+        new THREE.MeshBasicMaterial({ color: 0xfff0a4, transparent: true, opacity: 0.95 })
+      );
+      group.add(core);
+
+      const halo = new THREE.Mesh(
+        new THREE.SphereGeometry(0.42, 18, 12),
+        new THREE.MeshBasicMaterial({ color: 0xff5b38, transparent: true, opacity: 0.38, depthWrite: false })
+      );
+      group.add(halo);
+      return group;
+    }
+
+    function createSmokePuff(pos, phase) {
+      const group = new THREE.Group();
+      group.position.copy(pos);
+      group.userData.effect = "smoke";
+      group.userData.phase = phase;
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x6e6a61,
+        transparent: true,
+        opacity: 0.28,
+        depthWrite: false
+      });
+      for (let i = 0; i < 4; i++) {
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(0.22 + Math.random() * 0.22, 12, 8), mat.clone());
+        puff.position.set((Math.random() - 0.5) * 0.36, Math.random() * 0.8, (Math.random() - 0.5) * 0.36);
+        group.add(puff);
+      }
+      return group;
+    }
+
+    function createDustPuff(pos, phase) {
+      const group = createSmokePuff(pos, phase);
+      group.userData.effect = "dust";
+      group.children.forEach((child) => {
+        child.material.color.set(0xc29a57);
+        child.material.opacity = 0.23;
+      });
+      return group;
+    }
+
+    function addSmokeEmitter(object) {
+      const smoke = createSmokePuff(new THREE.Vector3(0, 0.42, 0), Math.random() * 2);
+      smoke.scale.setScalar(0.7);
+      object.add(smoke);
+      activeEffects.push(smoke);
+    }
+
+    function updateEventProgress(progress) {
+      const ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+      activeUnits.forEach((item, index) => {
+        const local = Math.min(1, Math.max(0, ease + index * 0.035));
+        item.unit.position.copy(item.from.clone().lerp(item.to, local));
+        item.unit.position.y += Math.sin(performance.now() * 0.002 + item.pulse) * 0.035;
+        const dir = item.to.clone().sub(item.from);
+        if (dir.lengthSq() > 0.001) {
+          item.unit.rotation.y = Math.atan2(dir.x, dir.z) + Math.PI / 2;
+        }
+      });
+    }
+
+    function updateEffects(dt, now) {
+      activeEffects.forEach((effect) => {
+        const type = effect.userData.effect;
+        if (type === "ring") {
+          const t = (now * 0.001 + effect.userData.phase) % 2.2;
+          const s = 0.8 + t * 1.15;
+          effect.scale.setScalar(s);
+          effect.material.opacity = Math.max(0, 0.78 - t * 0.34);
+        } else if (type === "burst") {
+          const age = ((now * 0.001) - effect.userData.delay) % 2.4;
+          const active = age > 0 && age < 1.4;
+          effect.visible = active;
+          if (active) {
+            const s = 0.4 + age * 1.9;
+            effect.scale.setScalar(s);
+            effect.children.forEach((child, i) => {
+              child.material.opacity = Math.max(0, (i ? 0.38 : 0.95) - age * 0.48);
+            });
+          }
+        } else if (type === "smoke" || type === "dust") {
+          effect.children.forEach((child, index) => {
+            child.position.y += dt * (0.08 + index * 0.02);
+            child.scale.multiplyScalar(1 + dt * 0.02);
+            if (child.position.y > 1.8) child.position.y = Math.random() * 0.2;
+          });
+        }
+      });
+
+      if (weatherParticles) {
+        const effect = weatherParticles.userData.effect;
+        const attr = weatherParticles.geometry.getAttribute("position");
+        const focus = weatherParticles.userData.focus;
+        for (let i = 0; i < attr.count; i++) {
+          let y = attr.getY(i);
+          let x = attr.getX(i);
+          let z = attr.getZ(i);
+          if (effect === "snow") {
+            y -= dt * 1.5;
+            x += Math.sin(now * 0.001 + i) * dt * 0.2;
+          } else if (effect === "rain") {
+            y -= dt * 4.4;
+            x += dt * 0.5;
+          } else if (effect === "dust") {
+            y += dt * 0.35;
+            x += dt * 0.9;
+          } else {
+            x += Math.sin(now * 0.0007 + i) * dt * 0.24;
+            z += Math.cos(now * 0.0009 + i) * dt * 0.2;
+          }
+          if (y < 0.25 || y > 6.6 || Math.abs(x - focus.x) > 6) {
+            y = 1 + Math.random() * 5.5;
+            x = focus.x + (Math.random() - 0.5) * 9;
+            z = focus.z + (Math.random() - 0.5) * 6.6;
+          }
+          attr.setXYZ(i, x, y, z);
+        }
+        attr.needsUpdate = true;
+      }
+
+      if (bannerTimer > 0) {
+        bannerTimer -= dt;
+        if (bannerTimer <= 0) tacticBanner.classList.remove("show");
+      }
+    }
+
+    function showTactic(tactic) {
+      tacticText.textContent = `計策發動：${tactic}`;
+      tacticBanner.classList.add("show");
+      bannerTimer = 2.7;
+    }
+
+    function initPointerState() {
+      return {
+        dragging: false,
+        x: 0,
+        y: 0,
+        theta: 0,
+        phi: 0
+      };
+    }
+
+    const pointerState = initPointerState();
+
+    function onPointerDown(event) {
+      pointerState.dragging = true;
+      pointerState.x = event.clientX;
+      pointerState.y = event.clientY;
+      pointerState.theta = cameraRig.theta;
+      pointerState.phi = cameraRig.phi;
+      canvas.setPointerCapture(event.pointerId);
+      canvas.addEventListener("pointermove", onPointerDrag);
+      canvas.addEventListener("pointerup", onPointerUp, { once: true });
+      canvas.addEventListener("pointercancel", onPointerUp, { once: true });
+    }
+
+    function onPointerDrag(event) {
+      if (!pointerState.dragging) return;
+      const dx = event.clientX - pointerState.x;
+      const dy = event.clientY - pointerState.y;
+      cameraRig.theta = pointerState.theta - dx * 0.006;
+      cameraRig.phi = clamp(pointerState.phi + dy * 0.004, 0.34, 1.42);
+      cameraRig.desired = null;
+    }
+
+    function onPointerUp(event) {
+      pointerState.dragging = false;
+      try {
+        canvas.releasePointerCapture(event.pointerId);
+      } catch (_) {}
+      canvas.removeEventListener("pointermove", onPointerDrag);
+    }
+
+    function onWheel(event) {
+      event.preventDefault();
+      cameraRig.radius = clamp(cameraRig.radius + event.deltaY * 0.035, 11, 96);
+      cameraRig.desired = null;
+    }
+
+    function onPointerHover(event) {
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+    }
+
+    function setCameraPreset(preset, animated = true, focusOverride = null) {
+      const presets = {
+        world: { target: [0, 0, 0], radius: 58, theta: -0.82, phi: 0.88 },
+        europe: { target: geoToWorld(18, 49, 0), radius: 16, theta: -0.88, phi: 0.76 },
+        pacific: { target: geoToWorld(-175, 28, 0), radius: 23, theta: -1.1, phi: 0.8 },
+        africa: { target: geoToWorld(18, 26, 0), radius: 17, theta: -0.68, phi: 0.8 }
+      };
+      const chosen = { ...(presets[preset] || presets.world) };
+      if (focusOverride) chosen.target = geoToWorld(focusOverride[0], focusOverride[1], 0);
+      if (Array.isArray(chosen.target)) chosen.target = new THREE.Vector3(...chosen.target);
+
+      if (!animated) {
+        cameraRig.target.copy(chosen.target);
+        cameraRig.radius = chosen.radius;
+        cameraRig.theta = chosen.theta;
+        cameraRig.phi = chosen.phi;
+        cameraRig.desired = null;
+        updateCamera(1);
+      } else {
+        cameraRig.desired = chosen;
+      }
+    }
+
+    function updateCamera(dt) {
+      if (cameraRig.desired) {
+        const t = 1 - Math.pow(0.001, dt);
+        cameraRig.target.lerp(cameraRig.desired.target, t);
+        cameraRig.radius += (cameraRig.desired.radius - cameraRig.radius) * t;
+        cameraRig.theta += shortestAngle(cameraRig.theta, cameraRig.desired.theta) * t;
+        cameraRig.phi += (cameraRig.desired.phi - cameraRig.phi) * t;
+        if (
+          cameraRig.target.distanceTo(cameraRig.desired.target) < 0.02 &&
+          Math.abs(cameraRig.radius - cameraRig.desired.radius) < 0.02
+        ) {
+          cameraRig.desired = null;
+        }
+      }
+
+      const sinPhi = Math.sin(cameraRig.phi);
+      const x = cameraRig.target.x + cameraRig.radius * sinPhi * Math.sin(cameraRig.theta);
+      const y = cameraRig.target.y + cameraRig.radius * Math.cos(cameraRig.phi);
+      const z = cameraRig.target.z + cameraRig.radius * sinPhi * Math.cos(cameraRig.theta);
+      camera.position.set(x, y, z);
+      camera.lookAt(cameraRig.target);
+    }
+
+    function updateLabels() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      labels.forEach((item) => {
+        if (!item.object.parent && !item.object.isScene) {
+          item.el.style.display = "none";
+          return;
+        }
+        item.object.updateWorldMatrix(true, false);
+        tempVec.setFromMatrixPosition(item.object.matrixWorld);
+        tempVec.project(camera);
+        const visible = tempVec.z > -1 && tempVec.z < 1;
+        if (!visible) {
+          item.el.style.opacity = 0;
+          return;
+        }
+        const x = (tempVec.x * 0.5 + 0.5) * width + (item.offset?.x || 0);
+        const y = (-tempVec.y * 0.5 + 0.5) * height + (item.offset?.y || 0);
+        item.el.style.opacity = item.eventLabel ? 1 : 0.82;
+        item.el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y}px)`;
+      });
+    }
+
+    function unitLabelOffset(index, total) {
+      const spread = total <= 2 ? 48 : 68;
+      const row = index % 2 === 0 ? -1 : 1;
+      const center = (total - 1) / 2;
+      return {
+        x: (index - center) * spread,
+        y: row * 26
+      };
+    }
+
+    function addLabel(object, html, className, eventLabel = false, offset = { x: 0, y: 0 }) {
+      const el = document.createElement("div");
+      el.className = className;
+      el.innerHTML = html;
+      labelLayer.appendChild(el);
+      const item = { object, el, eventLabel, offset };
+      labels.push(item);
+      return item;
+    }
+
+    function clearEventLabels() {
+      labels.slice().forEach((item) => {
+        if (item.eventLabel) {
+          item.el.remove();
+          const index = labels.indexOf(item);
+          if (index >= 0) labels.splice(index, 1);
+        }
+      });
+      eventLabels = [];
+    }
+
+    function geoToWorld(lon, lat, y = 0) {
+      let wrappedLon = lon;
+      if (wrappedLon > 180) wrappedLon -= 360;
+      if (wrappedLon < -180) wrappedLon += 360;
+      return new THREE.Vector3(
+        (wrappedLon / 180) * (WORLD.width / 2),
+        y,
+        -(lat / 90) * (WORLD.height / 2)
+      );
+    }
+
+    function makePolyline(points, color, opacity, y = 0.12) {
+      const positions = points.map(([lon, lat]) => {
+        const p = geoToWorld(lon, lat, y);
+        return p;
+      });
+      positions.push(positions[0].clone());
+      const geo = new THREE.BufferGeometry().setFromPoints(positions);
+      return new THREE.Line(
+        geo,
+        new THREE.LineBasicMaterial({ color, transparent: true, opacity })
+      );
+    }
+
+    function addPoliticalMapOverlay() {
+      const texture = createPoliticalMapTexture();
+      const overlay = new THREE.Mesh(
+        new THREE.PlaneGeometry(WORLD.width, WORLD.height),
+        new THREE.MeshBasicMaterial({
+          map: texture,
+          transparent: true,
+          opacity: 0.94,
+          depthWrite: false
+        })
+      );
+      overlay.rotation.x = -Math.PI / 2;
+      overlay.position.y = 0.215;
+      overlay.renderOrder = 2;
+      mapGroup.add(overlay);
+    }
+
+    function createPoliticalMapTexture() {
+      const canvasMap = document.createElement("canvas");
+      canvasMap.width = 2400;
+      canvasMap.height = 1200;
+      const ctx = canvasMap.getContext("2d");
+      ctx.clearRect(0, 0, canvasMap.width, canvasMap.height);
+
+      drawMapGrid(ctx, canvasMap.width, canvasMap.height);
+
+      landMasses.forEach((land) => {
+        drawMapPolygon(ctx, land.points, {
+          width: canvasMap.width,
+          height: canvasMap.height,
+          fill: "rgba(134, 152, 101, .28)",
+          stroke: "rgba(226, 202, 132, .42)",
+          lineWidth: 3
+        });
+      });
+
+      mapCountryAreas.forEach((area) => {
+        drawMapPolygon(ctx, area.points, {
+          width: canvasMap.width,
+          height: canvasMap.height,
+          fill: mapSideFill(area.side, .34),
+          stroke: mapSideStroke(area.side, .82),
+          lineWidth: 4
+        });
+      });
+
+      mapCountryAreas
+        .filter((area) => shouldDrawMapText(area))
+        .forEach((area) => {
+        const [x, y] = mapProject(area.label[0], area.label[1], canvasMap.width, canvasMap.height);
+        ctx.save();
+        ctx.font = "900 22px 'Microsoft JhengHei', 'Noto Sans TC', sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = "rgba(6, 8, 8, .82)";
+        ctx.fillStyle = mapSideText(area.side);
+        ctx.strokeText(area.name, x, y);
+        ctx.fillText(area.name, x, y);
+        ctx.restore();
+      });
+
+      const texture = new THREE.CanvasTexture(canvasMap);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = 8;
+      texture.needsUpdate = true;
+      return texture;
+    }
+
+    function shouldDrawMapText(area) {
+      return ["加拿大", "美國", "巴西", "北非英軍區", "蘇聯", "印度", "中國", "日本", "澳洲"].includes(area.name);
+    }
+
+    function drawMapGrid(ctx, width, height) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(220, 198, 132, .18)";
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([9, 12]);
+      for (let lon = -150; lon <= 150; lon += 30) {
+        const [x] = mapProject(lon, 0, width, height);
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      for (let lat = -60; lat <= 60; lat += 30) {
+        const [, y] = mapProject(0, lat, width, height);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    function drawMapPolygon(ctx, points, options) {
+      ctx.save();
+      ctx.beginPath();
+      points.forEach(([lon, lat], index) => {
+        const [x, y] = mapProject(lon, lat, options.width, options.height);
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.closePath();
+      ctx.fillStyle = options.fill;
+      ctx.fill();
+      ctx.strokeStyle = options.stroke;
+      ctx.lineWidth = options.lineWidth;
+      ctx.lineJoin = "round";
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function mapProject(lon, lat, width, height) {
+      let wrappedLon = lon;
+      if (wrappedLon > 180) wrappedLon -= 360;
+      if (wrappedLon < -180) wrappedLon += 360;
+      return [
+        ((wrappedLon + 180) / 360) * width,
+        ((90 - lat) / 180) * height
+      ];
+    }
+
+    function mapSideFill(side, alpha) {
+      if (side === "axis") return `rgba(255, 78, 66, ${alpha})`;
+      if (side === "neutral") return `rgba(88, 212, 123, ${alpha})`;
+      return `rgba(60, 167, 255, ${alpha})`;
+    }
+
+    function mapSideStroke(side, alpha) {
+      if (side === "axis") return `rgba(255, 106, 95, ${alpha})`;
+      if (side === "neutral") return `rgba(117, 235, 148, ${alpha})`;
+      return `rgba(99, 190, 255, ${alpha})`;
+    }
+
+    function mapSideText(side) {
+      if (side === "axis") return "#ffd0cb";
+      if (side === "neutral") return "#ccffd8";
+      return "#caebff";
+    }
+
+    function addMapCountryLabels() {
+      mapCountryLabels.forEach((label) => {
+        const obj = new THREE.Object3D();
+        obj.position.copy(geoToWorld(label.lon, label.lat, 0.72));
+        mapGroup.add(obj);
+        addLabel(obj, label.name, `scene-label map-country ${label.side}`);
+      });
+    }
+
+    function addMountainRange(name, points, scale = 1, color = 0x7c704f) {
+      points.forEach(([lon, lat], index) => {
+        const pos = geoToWorld(lon, lat, 0.14);
+        const peak = new THREE.Mesh(
+          new THREE.ConeGeometry(0.42 * scale, 1.15 * scale, 4),
+          new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0.04 })
+        );
+        peak.position.copy(pos);
+        peak.position.y += 0.46 * scale;
+        peak.rotation.y = index * 0.7;
+        peak.castShadow = true;
+        peak.receiveShadow = true;
+        mapGroup.add(peak);
+      });
+      const labelObj = new THREE.Object3D();
+      labelObj.position.copy(geoToWorld(points[Math.floor(points.length / 2)][0], points[Math.floor(points.length / 2)][1], 1.3 * scale));
+      mapGroup.add(labelObj);
+      addLabel(labelObj, name, "scene-label city");
+    }
+
+    function addNeutralZone(name, lon, lat) {
+      const pos = geoToWorld(lon, lat, 0.28);
+      const marker = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.28, 0.28, 0.08, 30),
+        new THREE.MeshBasicMaterial({ color: SIDE_COLORS.neutral, transparent: true, opacity: 0.55 })
+      );
+      marker.position.copy(pos);
+      mapGroup.add(marker);
+      addLabel(marker, name, "scene-label city");
+    }
+
+    function orientAlong(object, direction) {
+      if (direction.lengthSq() < 0.0001) return;
+      direction.normalize();
+      object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+    }
+
+    function makeFlagTexture(flag) {
+      const c = document.createElement("canvas");
+      c.width = 160;
+      c.height = 96;
+      const ctx = c.getContext("2d");
+      drawFlag(ctx, flag, 160, 96);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 4;
+      return tex;
+    }
+
+    function drawFlag(ctx, flag, w, h) {
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#777";
+      ctx.fillRect(0, 0, w, h);
+
+      if (flag === "usa") {
+        for (let i = 0; i < 13; i++) {
+          ctx.fillStyle = i % 2 ? "#fff" : "#b22234";
+          ctx.fillRect(0, i * h / 13, w, h / 13);
+        }
+        ctx.fillStyle = "#23406f";
+        ctx.fillRect(0, 0, w * 0.42, h * 0.54);
+        ctx.fillStyle = "#fff";
+        for (let y = 0; y < 5; y++) {
+          for (let x = 0; x < 6; x++) {
+            ctx.beginPath();
+            ctx.arc(9 + x * 9, 8 + y * 8, 1.4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      } else if (flag === "uk") {
+        ctx.fillStyle = "#012169";
+        ctx.fillRect(0, 0, w, h);
+        drawBand(ctx, 0, 0, w, h, "#fff", 16);
+        drawBand(ctx, 0, h, w, 0, "#fff", 16);
+        drawBand(ctx, 0, 0, w, h, "#c8102e", 7);
+        drawBand(ctx, 0, h, w, 0, "#c8102e", 7);
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(w * 0.42, 0, w * 0.16, h);
+        ctx.fillRect(0, h * 0.39, w, h * 0.22);
+        ctx.fillStyle = "#c8102e";
+        ctx.fillRect(w * 0.46, 0, w * 0.08, h);
+        ctx.fillRect(0, h * 0.44, w, h * 0.12);
+      } else if (flag === "ussr") {
+        ctx.fillStyle = "#c81925";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = "#ffd23f";
+        drawStar(ctx, 28, 22, 14, 6, 5);
+        ctx.font = "bold 20px sans-serif";
+        ctx.fillText("CCCP", 52, 30);
+      } else if (flag === "china") {
+        ctx.fillStyle = "#de2910";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = "#002b7f";
+        ctx.fillRect(0, 0, w * 0.46, h * 0.55);
+        ctx.fillStyle = "#fff";
+        drawStar(ctx, 36, 25, 16, 5, 12);
+      } else if (flag === "france") {
+        ctx.fillStyle = "#002395";
+        ctx.fillRect(0, 0, w / 3, h);
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(w / 3, 0, w / 3, h);
+        ctx.fillStyle = "#ed2939";
+        ctx.fillRect(w * 2 / 3, 0, w / 3, h);
+      } else if (flag === "poland") {
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, w, h / 2);
+        ctx.fillStyle = "#dc143c";
+        ctx.fillRect(0, h / 2, w, h / 2);
+      } else if (flag === "germany") {
+        ctx.fillStyle = "#c51f2b";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(w * 0.5, h * 0.5, h * 0.32, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#111";
+        ctx.fillRect(w * 0.46, h * 0.22, w * 0.08, h * 0.56);
+        ctx.fillRect(w * 0.32, h * 0.43, w * 0.36, h * 0.14);
+      } else if (flag === "japan") {
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = "rgba(188, 0, 45, .9)";
+        for (let i = 0; i < 16; i++) {
+          ctx.save();
+          ctx.translate(w * 0.5, h * 0.5);
+          ctx.rotate((Math.PI * 2 / 16) * i);
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(w * 0.62, -3);
+          ctx.lineTo(w * 0.62, 3);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+        ctx.fillStyle = "#bc002d";
+        ctx.beginPath();
+        ctx.arc(w * 0.5, h * 0.5, h * 0.23, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (flag === "italy") {
+        ctx.fillStyle = "#009246";
+        ctx.fillRect(0, 0, w / 3, h);
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(w / 3, 0, w / 3, h);
+        ctx.fillStyle = "#ce2b37";
+        ctx.fillRect(w * 2 / 3, 0, w / 3, h);
+      } else {
+        ctx.fillStyle = "#1d8d52";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(w * 0.43, h * 0.18, w * 0.14, h * 0.64);
+        ctx.fillRect(w * 0.25, h * 0.42, w * 0.5, h * 0.16);
+      }
+
+      ctx.strokeStyle = "rgba(0,0,0,.45)";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(1, 1, w - 2, h - 2);
+    }
+
+    function drawBand(ctx, x1, y1, x2, y2, color, width) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    function drawStar(ctx, cx, cy, outer, inner, points) {
+      ctx.beginPath();
+      for (let i = 0; i < points * 2; i++) {
+        const r = i % 2 === 0 ? outer : inner;
+        const a = -Math.PI / 2 + i * Math.PI / points;
+        const x = cx + Math.cos(a) * r;
+        const y = cy + Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function resize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    }
+
+    function animate(now) {
+      const dt = Math.min(0.05, (now - lastFrame) / 1000 || 0.016);
+      lastFrame = now;
+
+      if (autoplay) {
+        let next = timeline + dt * speed;
+        if (next >= events.length - 0.001) next = 0;
+        setTimeline(next);
+      }
+
+      const progress = timeline - Math.floor(timeline);
+      updateEventProgress(progress);
+      updateEffects(dt, now);
+      updateCamera(dt);
+      updateLabels();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    function shortestAngle(current, target) {
+      return Math.atan2(Math.sin(target - current), Math.cos(target - current));
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+  </script>
+</body>
+</html>
