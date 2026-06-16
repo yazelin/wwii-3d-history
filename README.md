@@ -30,18 +30,23 @@
 
 ## 本機預覽
 
-這是純靜態網站，不需要安裝 npm 套件。因為頁面使用 ES module 載入 Three.js，建議用本機 HTTP server 預覽，不要直接用 `file://` 開啟。
+這是純靜態網站，不需要安裝 npm 套件，也不需要 build。直接用瀏覽器開啟 HTML 檔即可：
+
+- 3D 地球版：`index.html`
+- 平面地圖版：`flat/index.html`
+
+也可以使用 `file://` URL，例如：
+
+- `file:///path/to/wwii-3d-history/index.html`
+- `file:///path/to/wwii-3d-history/flat/index.html`
+
+若瀏覽器或安全設定擋住 CDN module 載入，再改用本機 HTTP server 作為備用方式：
 
 ```bash
 python3 -m http.server 4173
 ```
 
-然後打開：
-
-- http://localhost:4173/
-- http://localhost:4173/flat/
-
-若 4173 已被占用，可換成其他 port。
+然後打開 `http://localhost:4173/` 或 `http://localhost:4173/flat/`。
 
 ## 部署
 
