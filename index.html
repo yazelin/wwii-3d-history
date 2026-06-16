@@ -2731,6 +2731,8 @@
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.anisotropy = 8;
       texture.wrapS = THREE.RepeatWrapping;
+      // SphereGeometry's +Z meridian samples texture longitude -90; shift the map back to align with geoToGlobe().
+      texture.offset.x = 0.25;
       texture.needsUpdate = true;
       return texture;
     }
